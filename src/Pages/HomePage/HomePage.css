@@ -1,0 +1,29 @@
+/* estilos.css */
+
+/* Estilo del fondo */
+body {
+    background-color: #e8f5e9;
+  }
+  
+  /* Estilos de la barra de navegación y el footer */
+  .btn-primary {
+    background-color: #2e7d32;
+    color: white;
+  }
+  
+  
+  
+  /* Botón primario al pasar el ratón */
+  .btn-primary:hover {
+    background-color: #1b5e20;
+  }
+  
+  /* tarjetas.css */
+  .card-title {
+    color: #388e3c;
+  }
+  /* listas.css */
+  .list-unstyled li {
+    color: #2e7d32;
+  }
+  

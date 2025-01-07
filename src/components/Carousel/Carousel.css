@@ -1,0 +1,29 @@
+/* carrusel.css */
+
+/* Estilo de los ítems del carrusel */
+.carousel-item {
+    position: relative;
+    width: 100%;
+    height: 500px;
+    background-size: cover;
+    background-position: center;
+}
+
+.carousel-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+/* Ocultar los números que aparecen debajo de los indicadores */
+.carousel-indicators li::after {
+    display: none;
+  }
+  /* Eliminar contenido no deseado dentro de los indicadores */
+.carousel-indicators li {
+    content: '';
+  }
+  
