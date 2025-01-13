@@ -4,6 +4,7 @@ import PageTitle from '../../components/PageTitle/PageTitle';
 
 const Configuration = () => {
   const location = useLocation();
+
   const [config, setConfig] = useState({
     nombre: '',
     temp_max: '',
@@ -17,13 +18,9 @@ const Configuration = () => {
   });
 
   const [mensaje, setMensaje] = useState('');
-  const [timezones, setTimezones] = useState([
-    'UTC',
-    'Europe/Madrid',
-    'America/Los_Angeles',
-    'America/Bogota',
-    'Asia/Tokyo'
-  ]);
+
+  // Este estado ahora empieza vacío y lo llenaremos con la API
+  const [timezones, setTimezones] = useState([]);
 
   const getSerialNumberFromURL = () => {
     const params = new URLSearchParams(location.search);
@@ -32,15 +29,34 @@ const Configuration = () => {
 
   const serialNumber = getSerialNumberFromURL();
 
-  // Cargar configuración inicial desde la API interna
+  // 1. useEffect para cargar las ZONAS HORARIAS desde un API externo
+  useEffect(() => {
+    // Puedes usar la API pública de worldtimeapi.org directamente:
+    fetch('https://worldtimeapi.org/api/timezone')
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('No se pudo obtener la lista de zonas horarias');
+        }
+        return res.json();
+      })
+      .then((data) => {
+        // data debería ser un array de strings con las zonas horarias
+        setTimezones(data);
+      })
+      .catch((err) => {
+        console.error(err);
+        setMensaje('Error al obtener la lista de zonas horarias: ' + err.message);
+      });
+  }, []);
+
+  // 2. useEffect para CARGAR la configuración de la estación
   useEffect(() => {
     if (!serialNumber) return;
     fetch(`/api/get-station-config.php?serial_number=${encodeURIComponent(serialNumber)}`, {
-      credentials: 'include' // Envío de cookies de sesión
+      credentials: 'include'
     })
       .then(res => {
         if (res.status === 401) {
-          // Usuario no autenticado, redirige al login si deseas:
           window.location.href = '/login';
           return null;
         }
@@ -66,18 +82,20 @@ const Configuration = () => {
       .catch(err => setMensaje('Error al cargar la configuración: ' + err.message));
   }, [serialNumber]);
 
+  // Manejo de cambios en los inputs
   const handleChange = (e) => {
     const { name, value } = e.target;
     setConfig((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Manejo de submit del formulario
   const handleSubmit = (e) => {
     e.preventDefault();
 
     fetch('/api/configure-station.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include', // Envío de cookies de sesión
+      credentials: 'include',
       body: JSON.stringify({
         serial_number: serialNumber,
         nombre: config.nombre,
@@ -93,7 +111,6 @@ const Configuration = () => {
     })
       .then(res => {
         if (res.status === 401) {
-          // Usuario no autenticado, redirige al login si deseas:
           window.location.href = '/login';
           return null;
         }
@@ -111,7 +128,7 @@ const Configuration = () => {
 
   return (
     <>
-    <div className="container mt-4 panel-control-container">
+      <div className="container mt-4 panel-control-container">
         <PageTitle title="Configurar estación" />
         <form onSubmit={handleSubmit}>
           <div className="form-group" style={{ marginBottom: '20px' }}>
@@ -216,6 +233,7 @@ const Configuration = () => {
             />
           </div>
 
+          {/* Aquí usamos el estado de timezones para llenar el <select> */}
           <div className="form-group" style={{ marginBottom: '20px' }}>
             <label htmlFor="timezone" style={{ fontWeight: 'bold' }}>Zona Horaria:</label>
             <select
@@ -225,11 +243,16 @@ const Configuration = () => {
               value={config.timezone}
               onChange={handleChange}
             >
-              {timezones.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
+              {/* Si no hay datos, podríamos mostrar un <option> de cargando... */}
+              {timezones.length === 0 ? (
+                <option value="">Cargando zonas horarias...</option>
+              ) : (
+                timezones.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

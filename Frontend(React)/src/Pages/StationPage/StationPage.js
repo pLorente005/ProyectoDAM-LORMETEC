@@ -25,16 +25,34 @@ const Station = () => {
   
   const [alerta, setAlerta] = useState(null);
 
+  /**
+   * Convierte un timestamp en formato "YYYY-MM-DD HH:mm:ss" (UTC)
+   * a la hora local de la estación. 
+   * - Añadimos 'Z' para que JS lo trate como UTC.
+   * - Usamos `toLocaleString()` con la opción timeZone.
+   */
+  function formatLocalTimestamp(timestampUTC, stationTz) {
+    if (!timestampUTC) return '';
+    const date = new Date(timestampUTC + 'Z');
+    return date.toLocaleString('es-ES', {
+      timeZone: stationTz || 'UTC',
+      dateStyle: 'short',
+      timeStyle: 'medium'
+    });
+  }
+
   const cargarDatos = async () => {
     try {
       let url = `/api/estacion.php?serial_number=${encodeURIComponent(serialNumber)}`;
       if (fecha) url += `&fecha=${encodeURIComponent(fecha)}`;
       if (hora) url += `&hora=${encodeURIComponent(hora)}`;
+
       const response = await fetch(url, {
         method: 'GET',
         credentials: 'include'
       });
       const data = await response.json();
+
       if (response.ok && data.success) {
         setInfoEstacion(data.infoEstacion);
         setEstadoEstacion(data.estadoEstacion);
@@ -60,6 +78,7 @@ const Station = () => {
     if (serialNumber) {
       cargarDatos();
     }
+    // eslint-disable-next-line
   }, [serialNumber, fecha, hora]);
 
   useEffect(() => {
@@ -75,6 +94,7 @@ const Station = () => {
     params.set('serial_number', serialNumber);
     if (fecha) params.set('fecha', fecha);
     if (hora) params.set('hora', hora);
+
     navigate(`/estacion?${params.toString()}`);
     cargarDatos();
   };
@@ -89,7 +109,11 @@ const Station = () => {
             <p><strong>Número de Serie:</strong> {serialNumber}</p>
             <p><strong>Ubicación:</strong> {infoEstacion.location}</p>
             <p><strong>Zona Horaria:</strong> {infoEstacion.timezone}</p>
-            <p><strong>Activa Desde:</strong> {infoEstacion.activa_desde}</p>
+            {/* Convertimos "activa_desde" a la hora local también */}
+            <p>
+              <strong>Activa Desde:</strong>{' '}
+              {formatLocalTimestamp(infoEstacion.activa_desde, infoEstacion.timezone)}
+            </p>
             <p><strong>Estado:</strong> {estadoEstacion}</p>
           </div>
         </div>
@@ -102,7 +126,9 @@ const Station = () => {
               <h4>Temperatura Actual</h4>
             </div>
             <div className="card-body">
-              <p className="display-4">{currentTemperature !== null ? `${currentTemperature} °C` : '--'}</p>
+              <p className="display-4">
+                {currentTemperature !== null ? `${currentTemperature} °C` : '--'}
+              </p>
             </div>
           </div>
         </div>
@@ -112,7 +138,9 @@ const Station = () => {
               <h4>Humedad Actual</h4>
             </div>
             <div className="card-body">
-              <p className="display-4">{currentHumidity !== null ? `${currentHumidity} %` : '--'}</p>
+              <p className="display-4">
+                {currentHumidity !== null ? `${currentHumidity} %` : '--'}
+              </p>
             </div>
           </div>
         </div>
@@ -122,23 +150,53 @@ const Station = () => {
         <div className="card">
           <div className="card-header" id="headingOne">
             <h2 className="mb-0">
-              <button className="btn btn-link btn-block text-left" type="button" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+              <button
+                className="btn btn-link btn-block text-left"
+                type="button"
+                data-toggle="collapse"
+                data-target="#collapseOne"
+                aria-expanded="true"
+                aria-controls="collapseOne"
+              >
                 Seleccionar Fecha y Hora
               </button>
             </h2>
           </div>
-          <div id="collapseOne" className="collapse show" aria-labelledby="headingOne" data-parent="#accordionExample">
+          <div
+            id="collapseOne"
+            className="collapse show"
+            aria-labelledby="headingOne"
+            data-parent="#accordionExample"
+          >
             <div className="card-body">
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
                   <label htmlFor="fecha">Fecha</label>
-                  <input type="date" className="form-control" id="fecha" name="fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="fecha"
+                    name="fecha"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="form-group">
                   <label htmlFor="hora">Hora</label>
-                  <input type="time" className="form-control" id="hora" name="hora" value={hora} onChange={(e) => setHora(e.target.value)} required />
+                  <input
+                    type="time"
+                    className="form-control"
+                    id="hora"
+                    name="hora"
+                    value={hora}
+                    onChange={(e) => setHora(e.target.value)}
+                    required
+                  />
                 </div>
-                <button type="submit" className="btn btn-primary mt-2">Ver Datos</button>
+                <button type="submit" className="btn btn-primary mt-2">
+                  Ver Datos
+                </button>
               </form>
             </div>
           </div>
@@ -149,12 +207,24 @@ const Station = () => {
         <div className="card">
           <div className="card-header" id="headingTwo">
             <h2 className="mb-0">
-              <button className="btn btn-link btn-block text-left" type="button" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
+              <button
+                className="btn btn-link btn-block text-left"
+                type="button"
+                data-toggle="collapse"
+                data-target="#collapseTwo"
+                aria-expanded="true"
+                aria-controls="collapseTwo"
+              >
                 Mostrar Datos de la Estación
               </button>
             </h2>
           </div>
-          <div id="collapseTwo" className="collapse show" aria-labelledby="headingTwo" data-parent="#accordionDatos">
+          <div
+            id="collapseTwo"
+            className="collapse show"
+            aria-labelledby="headingTwo"
+            data-parent="#accordionDatos"
+          >
             <div className="card-body">
               {datosEstacion.length > 0 ? (
                 <table className="table table-bordered data-table mt-4">
@@ -168,13 +238,36 @@ const Station = () => {
                   <tbody>
                     {datosEstacion.map((dato, i) => (
                       <tr key={i}>
-                        <td style={{color: (tempMax !== null && tempMin !== null && (dato.temperature > tempMax || dato.temperature < tempMin)) ? 'red' : 'black'}}>
+                        <td
+                          style={{
+                            color:
+                              tempMax !== null &&
+                              tempMin !== null &&
+                              (dato.temperature > tempMax ||
+                                dato.temperature < tempMin)
+                                ? 'red'
+                                : 'black'
+                          }}
+                        >
                           {dato.temperature}
                         </td>
-                        <td style={{color: (humMax !== null && humMin !== null && (dato.humidity > humMax || dato.humidity < humMin)) ? 'red' : 'black'}}>
+                        <td
+                          style={{
+                            color:
+                              humMax !== null &&
+                              humMin !== null &&
+                              (dato.humidity > humMax ||
+                                dato.humidity < humMin)
+                                ? 'red'
+                                : 'black'
+                          }}
+                        >
                           {dato.humidity}
                         </td>
-                        <td>{dato.timestamp}</td>
+                        {/* Aquí convertimos la fecha/hora UTC a la hora local de la estación */}
+                        <td>
+                          {formatLocalTimestamp(dato.timestamp, infoEstacion?.timezone)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
