@@ -86,7 +86,7 @@ const Login = () => {
           text={loading ? 'Cargando...' : 'Ingresar'}
           className="btn-primary btn-login"
           type="submit"
-          onClick={handleSubmit} // Si quieres manejar el evento en el Button, lo puedes pasar aquí
+          onClick={handleSubmit}
         />
       </form>
       {errorMessage && <p className="error-message text-center text-danger">{errorMessage}</p>}
