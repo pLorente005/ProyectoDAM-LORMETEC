@@ -27,7 +27,7 @@ const Station = () => {
 
   /**
    * Convierte un timestamp en formato "YYYY-MM-DD HH:mm:ss" (UTC)
-   * a la hora local de la estación. 
+   * a la hora local de la estación.
    * - Añadimos 'Z' para que JS lo trate como UTC.
    * - Usamos `toLocaleString()` con la opción timeZone.
    */
@@ -96,7 +96,6 @@ const Station = () => {
     if (hora) params.set('hora', hora);
 
     navigate(`/estacion?${params.toString()}`);
-    cargarDatos();
   };
 
   return (
@@ -158,7 +157,7 @@ const Station = () => {
                 aria-expanded="true"
                 aria-controls="collapseOne"
               >
-                Seleccionar Fecha y Hora
+                Seleccionar Fecha y Hora (hora local de la estación)
               </button>
             </h2>
           </div>
@@ -179,7 +178,6 @@ const Station = () => {
                     name="fecha"
                     value={fecha}
                     onChange={(e) => setFecha(e.target.value)}
-                    required
                   />
                 </div>
                 <div className="form-group">
@@ -191,7 +189,6 @@ const Station = () => {
                     name="hora"
                     value={hora}
                     onChange={(e) => setHora(e.target.value)}
-                    required
                   />
                 </div>
                 <button type="submit" className="btn btn-primary mt-2">
@@ -243,8 +240,7 @@ const Station = () => {
                             color:
                               tempMax !== null &&
                               tempMin !== null &&
-                              (dato.temperature > tempMax ||
-                                dato.temperature < tempMin)
+                              (dato.temperature > tempMax || dato.temperature < tempMin)
                                 ? 'red'
                                 : 'black'
                           }}
@@ -256,8 +252,7 @@ const Station = () => {
                             color:
                               humMax !== null &&
                               humMin !== null &&
-                              (dato.humidity > humMax ||
-                                dato.humidity < humMin)
+                              (dato.humidity > humMax || dato.humidity < humMin)
                                 ? 'red'
                                 : 'black'
                           }}
