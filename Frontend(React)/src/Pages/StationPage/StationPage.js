@@ -1,12 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fíjate en estos imports adicionales de los iconos por defecto de Leaflet:
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Ajustamos la ruta de los iconos para que no aparezcan rotos
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
 import PageTitle from '../../components/PageTitle/PageTitle';
-import './StationPage.css';
+import './StationPage.css'; // Aquí puedes incluir tu estilo, ver nota abajo para el #map-leaflet
 
 const Station = () => {
   const navigate = useNavigate();
   const query = new URLSearchParams(useLocation().search);
 
+  // State principal
   const initialSerial = query.get('serial_number') || '';
   const [serialNumber, setSerialNumber] = useState(initialSerial);
   
@@ -23,7 +40,13 @@ const Station = () => {
   const [humMin, setHumMin] = useState(null);
   const [datosEstacion, setDatosEstacion] = useState([]);
   
+  // Alerta
   const [alerta, setAlerta] = useState(null);
+
+  // Estado para el mapa
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
+  const [map, setMap] = useState(null); // referencia al mapa Leaflet
 
   /**
    * Convierte un timestamp en formato "YYYY-MM-DD HH:mm:ss" (UTC)
@@ -41,6 +64,10 @@ const Station = () => {
     });
   }
 
+  /**
+   * Llamada al endpoint /api/estacion.php para obtener la información
+   * y los datos de la estación.
+   */
   const cargarDatos = async () => {
     try {
       let url = `/api/estacion.php?serial_number=${encodeURIComponent(serialNumber)}`;
@@ -63,8 +90,14 @@ const Station = () => {
         setHumMax(data.humMax);
         setHumMin(data.humMin);
         setDatosEstacion(data.datosEstacion);
+
+        // Guardamos lat y long para el mapa
+        setLatitude(data.latitude);
+        setLongitude(data.longitude);
+
         setAlerta(null);
       } else if (response.status === 401) {
+        // Usuario no autenticado, redirigir a login (si corresponde)
         navigate('/login');
       } else {
         setAlerta({ tipo: 'danger', texto: data.message || 'No se pudieron cargar los datos de la estación.' });
@@ -74,6 +107,7 @@ const Station = () => {
     }
   };
 
+  // Efecto para cargar datos cuando cambia el serialNumber, fecha u hora
   useEffect(() => {
     if (serialNumber) {
       cargarDatos();
@@ -81,6 +115,7 @@ const Station = () => {
     // eslint-disable-next-line
   }, [serialNumber, fecha, hora]);
 
+  // Efecto para ocultar la alerta tras 5 segundos
   useEffect(() => {
     if (alerta) {
       const timer = setTimeout(() => setAlerta(null), 5000);
@@ -88,6 +123,39 @@ const Station = () => {
     }
   }, [alerta]);
 
+  // Inicializar/actualizar mapa Leaflet cuando tenemos lat/long
+  useEffect(() => {
+    if (latitude && longitude) {
+      if (!map) {
+        // Crear un mapa por primera vez
+        const newMap = L.map('map-leaflet').setView([latitude, longitude], 13);
+
+        // Capa base (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(newMap);
+
+        // Añadir marcador
+        L.marker([latitude, longitude]).addTo(newMap);
+
+        // Guardar la referencia en el state
+        setMap(newMap);
+      } else {
+        // Si el mapa ya existe, solo muevo la vista
+        map.setView([latitude, longitude], 13);
+
+        // Opcional: agregar un nuevo marcador o mover el existente
+        // Para simplificar, añadimos un nuevo marcador cada vez
+        L.marker([latitude, longitude]).addTo(map);
+      }
+    }
+  }, [latitude, longitude, map]);
+
+  /**
+   * Manejar el envío del formulario: cambiamos la URL con los params
+   * y React Router recargará el componente con esos valores.
+   */
   const handleSubmit = (e) => {
     e.preventDefault();
     const params = new URLSearchParams();
@@ -96,11 +164,14 @@ const Station = () => {
     if (hora) params.set('hora', hora);
 
     navigate(`/estacion?${params.toString()}`);
+    // No llamo aquí a cargarDatos() porque ya lo hará el effect
   };
 
   return (
     <div className="container mt-4 panel-control-container">
       <PageTitle title="Datos de la Estación" />
+
+      {/* Info general de la estación */}
       {infoEstacion && (
         <div className="info-mapa-container mt-4">
           <div className="info">
@@ -108,16 +179,29 @@ const Station = () => {
             <p><strong>Número de Serie:</strong> {serialNumber}</p>
             <p><strong>Ubicación:</strong> {infoEstacion.location}</p>
             <p><strong>Zona Horaria:</strong> {infoEstacion.timezone}</p>
-            {/* Convertimos "activa_desde" a la hora local también */}
             <p>
               <strong>Activa Desde:</strong>{' '}
               {formatLocalTimestamp(infoEstacion.activa_desde, infoEstacion.timezone)}
             </p>
             <p><strong>Estado:</strong> {estadoEstacion}</p>
           </div>
+
+          {/* Mapa con Leaflet */}
+          <div className="map-container">
+            {/*
+              Asegúrate de que #map-leaflet tenga un tamaño fijo en CSS.
+              Por ejemplo, en StationPage.css:
+              #map-leaflet {
+                width: 100%;
+                height: 400px;
+              }
+            */}
+            <div id="map-leaflet" />
+          </div>
         </div>
       )}
 
+      {/* Tarjetas de Temperatura y Humedad actuales */}
       <div className="row mt-4">
         <div className="col-md-6">
           <div className="card text-center">
@@ -145,6 +229,7 @@ const Station = () => {
         </div>
       </div>
 
+      {/* Formulario para filtrar por fecha/hora */}
       <div className="accordion form-container mt-4" id="accordionExample">
         <div className="card">
           <div className="card-header" id="headingOne">
@@ -157,7 +242,7 @@ const Station = () => {
                 aria-expanded="true"
                 aria-controls="collapseOne"
               >
-                Seleccionar Fecha y Hora (hora local de la estación)
+                Seleccionar Fecha y Hora
               </button>
             </h2>
           </div>
@@ -200,6 +285,7 @@ const Station = () => {
         </div>
       </div>
 
+      {/* Tabla con los datos de la estación */}
       <div className="accordion mt-4" id="accordionDatos">
         <div className="card">
           <div className="card-header" id="headingTwo">
@@ -259,7 +345,6 @@ const Station = () => {
                         >
                           {dato.humidity}
                         </td>
-                        {/* Aquí convertimos la fecha/hora UTC a la hora local de la estación */}
                         <td>
                           {formatLocalTimestamp(dato.timestamp, infoEstacion?.timezone)}
                         </td>
@@ -275,6 +360,7 @@ const Station = () => {
         </div>
       </div>
 
+      {/* Alerta */}
       {alerta && (
         <div className={`alert alert-${alerta.tipo} custom-alert mt-4`} role="alert">
           {alerta.texto}
