@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+// ---- amCharts 4 ----
+import * as am4core from '@amcharts/amcharts4/core';
+import * as am4charts from '@amcharts/amcharts4/charts';
+import am4themes_animated from '@amcharts/amcharts4/themes/animated';
+
+// Aplicamos el tema animado de amCharts
+am4core.useTheme(am4themes_animated);
 
 // Fíjate en estos imports adicionales de los iconos por defecto de Leaflet:
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -17,7 +25,7 @@ L.Icon.Default.mergeOptions({
 });
 
 import PageTitle from '../../components/PageTitle/PageTitle';
-import './StationPage.css'; // Aquí puedes incluir tu estilo, ver nota abajo para el #map-leaflet
+import './StationPage.css';
 
 const Station = () => {
   const navigate = useNavigate();
@@ -26,10 +34,9 @@ const Station = () => {
   // State principal
   const initialSerial = query.get('serial_number') || '';
   const [serialNumber, setSerialNumber] = useState(initialSerial);
-  
   const [fecha, setFecha] = useState(query.get('fecha') || '');
   const [hora, setHora] = useState(query.get('hora') || '');
-  
+
   const [infoEstacion, setInfoEstacion] = useState(null);
   const [estadoEstacion, setEstadoEstacion] = useState('');
   const [currentTemperature, setCurrentTemperature] = useState(null);
@@ -39,14 +46,18 @@ const Station = () => {
   const [humMax, setHumMax] = useState(null);
   const [humMin, setHumMin] = useState(null);
   const [datosEstacion, setDatosEstacion] = useState([]);
-  
+
   // Alerta
   const [alerta, setAlerta] = useState(null);
 
-  // Estado para el mapa
+  // Estado para el mapa Leaflet
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
-  const [map, setMap] = useState(null); // referencia al mapa Leaflet
+  const [map, setMap] = useState(null);
+
+  // Referencias a los gráficos (para destruirlos al recargar datos)
+  const chartTempRef = useRef(null);
+  const chartHumRef = useRef(null);
 
   /**
    * Convierte un timestamp en formato "YYYY-MM-DD HH:mm:ss" (UTC)
@@ -100,14 +111,17 @@ const Station = () => {
         // Usuario no autenticado, redirigir a login (si corresponde)
         navigate('/login');
       } else {
-        setAlerta({ tipo: 'danger', texto: data.message || 'No se pudieron cargar los datos de la estación.' });
+        setAlerta({
+          tipo: 'danger',
+          texto: data.message || 'No se pudieron cargar los datos de la estación.'
+        });
       }
     } catch (error) {
       setAlerta({ tipo: 'danger', texto: error.message });
     }
   };
 
-  // Efecto para cargar datos cuando cambia el serialNumber, fecha u hora
+  // Efecto para cargar datos cuando cambian serialNumber, fecha u hora
   useEffect(() => {
     if (serialNumber) {
       cargarDatos();
@@ -144,16 +158,13 @@ const Station = () => {
       } else {
         // Si el mapa ya existe, solo muevo la vista
         map.setView([latitude, longitude], 13);
-
-        // Opcional: agregar un nuevo marcador o mover el existente
-        // Para simplificar, añadimos un nuevo marcador cada vez
         L.marker([latitude, longitude]).addTo(map);
       }
     }
   }, [latitude, longitude, map]);
 
   /**
-   * Manejar el envío del formulario: cambiamos la URL con los params
+   * Manejar el envío del formulario: cambiamos la URL con los params,
    * y React Router recargará el componente con esos valores.
    */
   const handleSubmit = (e) => {
@@ -164,8 +175,174 @@ const Station = () => {
     if (hora) params.set('hora', hora);
 
     navigate(`/estacion?${params.toString()}`);
-    // No llamo aquí a cargarDatos() porque ya lo hará el effect
   };
+
+  /**
+   * Efecto que construye (o reconstruye) los dos gráficos 
+   * cuando cambian los datos de la estación.
+   */
+  useEffect(() => {
+    // Si no hay datos, destruimos los charts si existen y salimos.
+    if (!datosEstacion || datosEstacion.length === 0) {
+      if (chartTempRef.current) {
+        chartTempRef.current.dispose();
+        chartTempRef.current = null;
+      }
+      if (chartHumRef.current) {
+        chartHumRef.current.dispose();
+        chartHumRef.current = null;
+      }
+      return;
+    }
+
+    // Destruir instancias previas para evitar fugas de memoria
+    if (chartTempRef.current) {
+      chartTempRef.current.dispose();
+    }
+    if (chartHumRef.current) {
+      chartHumRef.current.dispose();
+    }
+
+    // ---- Preparar datos para los gráficos ----
+    const chartData = datosEstacion.map(dato => ({
+      // Ajusta el timestamp si es necesario para interpretarlo como UTC
+      timestamp: new Date(dato.timestamp + 'Z'),
+      temperature: Number(dato.temperature),
+      humidity: Number(dato.humidity)
+    }));
+
+    // ======================================================
+    //                 GRÁFICO DE TEMPERATURA
+    // ======================================================
+    const chartTemp = am4core.create('graficoTemperatura', am4charts.XYChart);
+    chartTemp.data = chartData;
+
+    // Eje X (fecha-hora)
+    const dateAxisTemp = chartTemp.xAxes.push(new am4charts.DateAxis());
+    dateAxisTemp.title.text = 'Fecha y Hora';
+
+    // Eje Y (temperatura)
+    const valueAxisTemp = chartTemp.yAxes.push(new am4charts.ValueAxis());
+    valueAxisTemp.title.text = 'Temperatura (°C)';
+    // Limitar eje de temperatura entre -20 y 80
+    valueAxisTemp.min = -20;
+    valueAxisTemp.max = 80;
+
+    // Ajustar el valor base para el área sombreada
+    valueAxisTemp.baseValue = -20;
+
+    // Serie de Temperatura
+    const seriesTemp = chartTemp.series.push(new am4charts.LineSeries());
+    seriesTemp.dataFields.valueY = 'temperature';
+    seriesTemp.dataFields.dateX = 'timestamp';
+    seriesTemp.name = 'Temperatura (°C)';
+    seriesTemp.strokeWidth = 2;
+    seriesTemp.tooltipText = '{valueY} °C';
+    // Colores
+    seriesTemp.stroke = am4core.color('rgba(255, 99, 132, 1)');
+    seriesTemp.fillOpacity = 0.2;
+    seriesTemp.fill = am4core.color('rgba(255, 99, 132, 0.2)');
+
+    // Cursor para hover
+    chartTemp.cursor = new am4charts.XYCursor();
+    chartTemp.cursor.xAxis = dateAxisTemp;
+
+    // Líneas de referencia: Temp Max
+    if (tempMax != null) {
+      const rangeMaxTemp = valueAxisTemp.axisRanges.create();
+      rangeMaxTemp.value = tempMax;
+      rangeMaxTemp.grid.stroke = am4core.color('rgba(255, 0, 0, 0.7)');
+      rangeMaxTemp.grid.strokeWidth = 2;
+      rangeMaxTemp.label.inside = true;
+      rangeMaxTemp.label.text = 'Temp Max';
+      rangeMaxTemp.label.fill = am4core.color('#FF0000');
+      rangeMaxTemp.label.verticalCenter = 'bottom';
+    }
+    // Líneas de referencia: Temp Min
+    if (tempMin != null) {
+      const rangeMinTemp = valueAxisTemp.axisRanges.create();
+      rangeMinTemp.value = tempMin;
+      rangeMinTemp.grid.stroke = am4core.color('rgba(0, 0, 255, 0.7)');
+      rangeMinTemp.grid.strokeWidth = 2;
+      rangeMinTemp.label.inside = true;
+      rangeMinTemp.label.text = 'Temp Min';
+      rangeMinTemp.label.fill = am4core.color('#0000FF');
+      rangeMinTemp.label.verticalCenter = 'top';
+    }
+
+    // Guardar referencia para destruirlo después
+    chartTempRef.current = chartTemp;
+
+    // ======================================================
+    //                 GRÁFICO DE HUMEDAD
+    // ======================================================
+    const chartHum = am4core.create('graficoHumedad', am4charts.XYChart);
+    chartHum.data = chartData;
+
+    // Eje X (fecha-hora)
+    const dateAxisHum = chartHum.xAxes.push(new am4charts.DateAxis());
+    dateAxisHum.title.text = 'Fecha y Hora';
+
+    // Eje Y (humedad)
+    const valueAxisHum = chartHum.yAxes.push(new am4charts.ValueAxis());
+    valueAxisHum.title.text = 'Humedad (%)';
+    // Limitar eje de humedad entre 0 y 100
+    valueAxisHum.min = 0;
+    valueAxisHum.max = 100;
+
+    // Serie de Humedad
+    const seriesHum = chartHum.series.push(new am4charts.LineSeries());
+    seriesHum.dataFields.valueY = 'humidity';
+    seriesHum.dataFields.dateX = 'timestamp';
+    seriesHum.name = 'Humedad (%)';
+    seriesHum.strokeWidth = 2;
+    seriesHum.tooltipText = '{valueY} %';
+    // Colores
+    seriesHum.stroke = am4core.color('rgba(54, 162, 235, 1)');
+    seriesHum.fillOpacity = 0.2;
+    seriesHum.fill = am4core.color('rgba(54, 162, 235, 0.2)');
+
+    // Cursor para hover
+    chartHum.cursor = new am4charts.XYCursor();
+    chartHum.cursor.xAxis = dateAxisHum;
+
+    // Líneas de referencia: Hum Max
+    if (humMax != null) {
+      const rangeMaxHum = valueAxisHum.axisRanges.create();
+      rangeMaxHum.value = humMax;
+      rangeMaxHum.grid.stroke = am4core.color('rgba(255, 0, 0, 0.7)');
+      rangeMaxHum.grid.strokeWidth = 2;
+      rangeMaxHum.label.inside = true;
+      rangeMaxHum.label.text = 'Hum Max';
+      rangeMaxHum.label.fill = am4core.color('#FF0000');
+      rangeMaxHum.label.verticalCenter = 'bottom';
+    }
+    // Líneas de referencia: Hum Min
+    if (humMin != null) {
+      const rangeMinHum = valueAxisHum.axisRanges.create();
+      rangeMinHum.value = humMin;
+      rangeMinHum.grid.stroke = am4core.color('rgba(0, 0, 255, 0.7)');
+      rangeMinHum.grid.strokeWidth = 2;
+      rangeMinHum.label.inside = true;
+      rangeMinHum.label.text = 'Hum Min';
+      rangeMinHum.label.fill = am4core.color('#0000FF');
+      rangeMinHum.label.verticalCenter = 'top';
+    }
+
+    // Guardar referencia para destruirlo después
+    chartHumRef.current = chartHum;
+
+
+    // Limpieza en caso de que el componente se desmonte
+    return () => {
+      if (chartTemp) {
+        chartTemp.dispose();
+      }
+      if (chartHum) {
+        chartHum.dispose();
+      }
+    };
+  }, [datosEstacion, tempMax, tempMin, humMax, humMin]);
 
   return (
     <div className="container mt-4 panel-control-container">
@@ -180,7 +357,7 @@ const Station = () => {
             <p><strong>Ubicación:</strong> {infoEstacion.location}</p>
             <p><strong>Zona Horaria:</strong> {infoEstacion.timezone}</p>
             <p>
-              <strong>Activa Desde:</strong>{' '}
+              <strong>Activa Desde: </strong>
               {formatLocalTimestamp(infoEstacion.activa_desde, infoEstacion.timezone)}
             </p>
             <p><strong>Estado:</strong> {estadoEstacion}</p>
@@ -188,14 +365,6 @@ const Station = () => {
 
           {/* Mapa con Leaflet */}
           <div className="map-container">
-            {/*
-              Asegúrate de que #map-leaflet tenga un tamaño fijo en CSS.
-              Por ejemplo, en StationPage.css:
-              #map-leaflet {
-                width: 100%;
-                height: 400px;
-              }
-            */}
             <div id="map-leaflet" />
           </div>
         </div>
@@ -358,6 +527,15 @@ const Station = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Gráficos de Temperatura y Humedad */}
+      <div className="mt-5">
+        <h4 className="text-center">Gráfico de Temperatura</h4>
+        <div id="graficoTemperatura" style={{ width: '100%', height: '400px' }} />
+
+        <h4 className="text-center mt-5">Gráfico de Humedad</h4>
+        <div id="graficoHumedad" style={{ width: '100%', height: '400px' }} />
       </div>
 
       {/* Alerta */}
