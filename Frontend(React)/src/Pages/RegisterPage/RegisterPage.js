@@ -1,15 +1,16 @@
-// src/pages/LoginPage/Login.js
 
 import React, { useState, useContext } from 'react';
-import { useNavigate, Link } from 'react-router-dom'; // Importar Link
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import Button from '../../components/Button/Button';
 import PageTitle from '../../components/PageTitle/PageTitle';
-import './LoginPage.css';
+import './RegisterPage.css'; // Importa el CSS aquí
 
-const Login = () => {
+const Register = () => {
+  const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [contrasena, setContrasena] = useState('');
+  const [confirmarContrasena, setConfirmarContrasena] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,31 +20,35 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+
+    // Validaciones básicas
+    if (contrasena !== confirmarContrasena) {
+      setErrorMessage('Las contraseñas no coinciden.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch('/api/login.php', {
+      const response = await fetch('/api/register.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', 
+        credentials: 'include', // Si necesitas manejar cookies
         body: JSON.stringify({
+          nombre: nombre,
           email: email,
-          contrasena: password,
+          contrasena: contrasena,
         }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        console.log('Inicio de sesión exitoso:', data);
-
-        // Actualizar el estado de autenticación
-        setIsAuthenticated(true);
-
-        // Redirigir al panel de control
-        navigate('/panel-control');
+        console.log('Registro exitoso:', data);
+        // Redirigir a la página de inicio de sesión
+        navigate('/login');
       } else {
         setErrorMessage(data.message || 'Error desconocido.');
       }
@@ -56,9 +61,21 @@ const Login = () => {
   };
 
   return (
-    <div className="login-container">
-      <PageTitle title="Iniciar Sesión" />
+    <div className="register-container">
+      <PageTitle title="Registrarse" />
       <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="nombre">Nombre</label>
+          <input
+            type="text"
+            className="form-control"
+            id="nombre"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ingresa tu nombre"
+            required
+          />
+        </div>
         <div className="form-group">
           <label htmlFor="email">Correo Electrónico</label>
           <input
@@ -72,32 +89,43 @@ const Login = () => {
           />
         </div>
         <div className="form-group">
-          <label htmlFor="password">Contraseña</label>
+          <label htmlFor="contrasena">Contraseña</label>
           <input
             type="password"
             className="form-control"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            id="contrasena"
+            value={contrasena}
+            onChange={(e) => setContrasena(e.target.value)}
             placeholder="Ingresa tu contraseña"
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="confirmarContrasena">Confirmar Contraseña</label>
+          <input
+            type="password"
+            className="form-control"
+            id="confirmarContrasena"
+            value={confirmarContrasena}
+            onChange={(e) => setConfirmarContrasena(e.target.value)}
+            placeholder="Confirma tu contraseña"
             required
           />
         </div>
         {/* Reemplazamos el botón HTML con el componente Button */}
         <Button
-          text={loading ? 'Cargando...' : 'Ingresar'}
-          className="btn-primary btn-login"
+          text={loading ? 'Cargando...' : 'Registrarse'}
+          className="btn-primary btn-register"
           type="submit"
           onClick={handleSubmit}
         />
       </form>
       {errorMessage && <p className="error-message text-center text-danger">{errorMessage}</p>}
-      {/* Enlace para ir a la página de registro */}
       <p className="text-center mt-3">
-        ¿No tienes una cuenta? <Link to="/register">Regístrate aquí</Link>
+        ¿Ya tienes una cuenta? <a href="/login">Inicia sesión aquí</a>
       </p>
     </div>
   );
 };
 
-export default Login;
+export default Register;

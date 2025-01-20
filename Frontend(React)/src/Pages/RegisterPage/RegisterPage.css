@@ -1,0 +1,55 @@
+/* src/pages/RegisterPage/RegisterPage.css */
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    background-color: #e8f5e9;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Contenedor de registro (similar al contenedor de inicio de sesión) */
+.register-container {
+    width: 400px;
+    margin: 50px auto;
+    margin-bottom: 200px;
+    padding: 20px;
+    background-color: white;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    flex: 1;
+}
+
+.register-container h2 {
+    color: #2e7d32;
+}
+
+/* Hover en el botón primario */
+.btn-primary:hover {
+    background-color: #1b5e20;
+}
+
+.btn-primary {
+    background-color: #2e7d32;
+    color: white;
+}
+
+.btn-register {
+    margin-top: 20px;
+    width: 100%; 
+}
+
+/* Espaciado entre los elementos del formulario */
+.form-group {
+    margin-bottom: 24px; /* Incrementado para mayor espacio entre campos */
+}
+
+/* Espacio entre el label y el input */
+.form-group label {
+    margin-bottom: 10px; /* Incrementado ligeramente para separación visual */
+    display: block;
+}
