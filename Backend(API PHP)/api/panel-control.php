@@ -45,7 +45,7 @@ try {
 
         $mensaje = añadirEstacion($conn, $usuarioID, $numeroSerie, $modelo);
         $success = strpos($mensaje, "exitosamente") !== false;
-        $tipo = $success ? 'success' : 'warning';
+        $tipo = $success ? 'success' : (strpos($mensaje, "otro usuario") !== false ? 'warning' : 'danger');
 
         echo json_encode([
             'success' => $success,
@@ -77,30 +77,33 @@ try {
  * Función para añadir una estación.
  */
 function añadirEstacion($conn, $usuarioID, $numeroSerie, $modelo) {
-    $sqlCheckDevice = "SELECT * FROM station WHERE serial_number = ? AND model = ?";
+    // Verificar si la estación existe
+    $sqlCheckDevice = "SELECT user_id FROM station WHERE serial_number = ? AND model = ?";
     $stmtCheckDevice = $conn->prepare($sqlCheckDevice);
     $stmtCheckDevice->bind_param("ss", $numeroSerie, $modelo);
     $stmtCheckDevice->execute();
     $resultDevice = $stmtCheckDevice->get_result();
 
     if ($resultDevice->num_rows > 0) {
-        $sqlCheckUserStation = "SELECT * FROM station WHERE serial_number = ? AND user_id = ?";
-        $stmtCheckUserStation = $conn->prepare($sqlCheckUserStation);
-        $stmtCheckUserStation->bind_param("si", $numeroSerie, $usuarioID);
-        $stmtCheckUserStation->execute();
-        $resultUserStation = $stmtCheckUserStation->get_result();
+        $row = $resultDevice->fetch_assoc();
+        $currentUserId = $row['user_id'];
 
-        if ($resultUserStation->num_rows > 0) {
+        if ($currentUserId === null) {
+            // La estación no está asociada a ningún usuario, proceder a asociarla
+            $sqlAssociateStation = "UPDATE station SET user_id = ? WHERE serial_number = ?";
+            $stmtAssociateStation = $conn->prepare($sqlAssociateStation);
+            $stmtAssociateStation->bind_param("is", $usuarioID, $numeroSerie);
+            if ($stmtAssociateStation->execute()) {
+                return "Estación asociada exitosamente.";
+            }
+            return "Error al asociar la estación.";
+        } elseif ($currentUserId == $usuarioID) {
+            // La estación ya está asociada a este usuario
             return "El dispositivo ya está asociado a este usuario.";
+        } else {
+            // La estación está asociada a otro usuario
+            return "El dispositivo ya está asociado a otro usuario.";
         }
-
-        $sqlAssociateStation = "UPDATE station SET user_id = ? WHERE serial_number = ?";
-        $stmtAssociateStation = $conn->prepare($sqlAssociateStation);
-        $stmtAssociateStation->bind_param("is", $usuarioID, $numeroSerie);
-        if ($stmtAssociateStation->execute()) {
-            return "Estación asociada exitosamente.";
-        }
-        return "Error al asociar la estación.";
     }
 
     return "El número de serie '$numeroSerie' no existe en la base de datos.";
