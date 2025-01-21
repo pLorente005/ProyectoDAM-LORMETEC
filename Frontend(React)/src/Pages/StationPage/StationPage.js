@@ -11,7 +11,7 @@ import am4themes_animated from '@amcharts/amcharts4/themes/animated';
 // Aplicamos el tema animado de amCharts
 am4core.useTheme(am4themes_animated);
 
-// Fíjate en estos imports adicionales de los iconos por defecto de Leaflet:
+// Iconos de Leaflet
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -59,11 +59,13 @@ const Station = () => {
   const chartTempRef = useRef(null);
   const chartHumRef = useRef(null);
 
+  // Nuevas referencias para los gauges
+  const gaugeTempRef = useRef(null);
+  const gaugeHumRef = useRef(null);
+
   /**
    * Convierte un timestamp en formato "YYYY-MM-DD HH:mm:ss" (UTC)
    * a la hora local de la estación.
-   * - Añadimos 'Z' para que JS lo trate como UTC.
-   * - Usamos `toLocaleString()` con la opción timeZone.
    */
   function formatLocalTimestamp(timestampUTC, stationTz) {
     if (!timestampUTC) return '';
@@ -192,6 +194,15 @@ const Station = () => {
         chartHumRef.current.dispose();
         chartHumRef.current = null;
       }
+      // También destruimos los gauges si existen
+      if (gaugeTempRef.current) {
+        gaugeTempRef.current.dispose();
+        gaugeTempRef.current = null;
+      }
+      if (gaugeHumRef.current) {
+        gaugeHumRef.current.dispose();
+        gaugeHumRef.current = null;
+      }
       return;
     }
 
@@ -201,6 +212,13 @@ const Station = () => {
     }
     if (chartHumRef.current) {
       chartHumRef.current.dispose();
+    }
+    // Destruir gauges previos
+    if (gaugeTempRef.current) {
+      gaugeTempRef.current.dispose();
+    }
+    if (gaugeHumRef.current) {
+      gaugeHumRef.current.dispose();
     }
 
     // ---- Preparar datos para los gráficos ----
@@ -289,7 +307,7 @@ const Station = () => {
     // Limitar eje de humedad entre 0 y 100
     valueAxisHum.min = 0;
     valueAxisHum.max = 100;
-
+    
     // Serie de Humedad
     const seriesHum = chartHum.series.push(new am4charts.LineSeries());
     seriesHum.dataFields.valueY = 'humidity';
@@ -332,6 +350,101 @@ const Station = () => {
     // Guardar referencia para destruirlo después
     chartHumRef.current = chartHum;
 
+    // ======================================================
+    //                 GAUGES DE TEMPERATURA Y HUMEDAD
+    // ======================================================
+
+    // --------------------
+    // Gauge de Temperatura
+    // --------------------
+    const gaugeTemp = am4core.create('gaugeTemperatura', am4charts.GaugeChart);
+    gaugeTemp.innerRadius = am4core.percent(82);
+
+    // Eje del gauge de Temperatura
+    const axisTemp = gaugeTemp.xAxes.push(new am4charts.ValueAxis());
+    axisTemp.min = tempMin !== null ? tempMin - 5 : 0; // Ajusta el mínimo según tempMin
+    axisTemp.max = tempMax !== null ? tempMax + 5 : 50; // Ajusta el máximo según tempMax
+    axisTemp.strictMinMax = true;
+    axisTemp.renderer.axisFills.template.fill = am4core.color('#fff');
+    axisTemp.renderer.labels.template.fill = am4core.color('#000');
+
+    // Rango de colores para Temperatura
+    const rangeTempLow = axisTemp.axisRanges.create();
+    rangeTempLow.value = tempMin !== null ? tempMin - 5 : 0;
+    rangeTempLow.endValue = tempMin !== null ? tempMin : 0;
+    rangeTempLow.axisFill.fill = am4core.color('#0000FF'); // Azul
+    rangeTempLow.axisFill.fillOpacity = 1;
+
+    const rangeTempMid = axisTemp.axisRanges.create();
+    rangeTempMid.value = tempMin !== null ? tempMin : 0;
+    rangeTempMid.endValue = tempMax !== null ? tempMax : 50;
+    rangeTempMid.axisFill.fill = am4core.color('#00FF00'); // Verde
+    rangeTempMid.axisFill.fillOpacity = 1;
+
+    const rangeTempHigh = axisTemp.axisRanges.create();
+    rangeTempHigh.value = tempMax !== null ? tempMax : 50;
+    rangeTempHigh.endValue = tempMax !== null ? tempMax + 5 : 60;
+    rangeTempHigh.axisFill.fill = am4core.color('#FF0000'); // Rojo
+    rangeTempHigh.axisFill.fillOpacity = 1;
+
+    // Mano del gauge de Temperatura
+    const handTemp = gaugeTemp.hands.push(new am4charts.ClockHand());
+    handTemp.value = currentTemperature !== null ? currentTemperature : 0;
+
+    // Título del gauge de Temperatura
+    const titleTemp = gaugeTemp.chartContainer.createChild(am4core.Label);
+    titleTemp.fontSize = 20;
+    titleTemp.horizontalCenter = 'middle';
+    titleTemp.y = am4core.percent(100);
+
+    // Guardar referencia
+    gaugeTempRef.current = gaugeTemp;
+
+    // --------------------
+    // Gauge de Humedad
+    // --------------------
+    const gaugeHum = am4core.create('gaugeHumedad', am4charts.GaugeChart);
+    gaugeHum.innerRadius = am4core.percent(82);
+
+    // Eje del gauge de Humedad
+    const axisHum = gaugeHum.xAxes.push(new am4charts.ValueAxis());
+    axisHum.min = humMin !== null ? humMin - 10 : 0; // Ajusta el mínimo según humMin
+    axisHum.max = humMax !== null ? humMax + 10 : 100; // Ajusta el máximo según humMax
+    axisHum.strictMinMax = true;
+    axisHum.renderer.axisFills.template.fill = am4core.color('#fff');
+    axisHum.renderer.labels.template.fill = am4core.color('#000');
+
+    // Rango de colores para Humedad
+    const rangeHumLow = axisHum.axisRanges.create();
+    rangeHumLow.value = humMin !== null ? humMin - 10 : 0;
+    rangeHumLow.endValue = humMin !== null ? humMin : 0;
+    rangeHumLow.axisFill.fill = am4core.color('#0000FF'); // Azul
+    rangeHumLow.axisFill.fillOpacity = 1;
+
+    const rangeHumMid = axisHum.axisRanges.create();
+    rangeHumMid.value = humMin !== null ? humMin : 0;
+    rangeHumMid.endValue = humMax !== null ? humMax : 100;
+    rangeHumMid.axisFill.fill = am4core.color('#00FF00'); // Verde
+    rangeHumMid.axisFill.fillOpacity = 1;
+
+    const rangeHumHigh = axisHum.axisRanges.create();
+    rangeHumHigh.value = humMax !== null ? humMax : 100;
+    rangeHumHigh.endValue = humMax !== null ? humMax + 10 : 110;
+    rangeHumHigh.axisFill.fill = am4core.color('#FFFF00'); // Amarillo
+    rangeHumHigh.axisFill.fillOpacity = 1;
+
+    // Mano del gauge de Humedad
+    const handHum = gaugeHum.hands.push(new am4charts.ClockHand());
+    handHum.value = currentHumidity !== null ? currentHumidity : 0;
+
+    // Título del gauge de Humedad
+    const titleHum = gaugeHum.chartContainer.createChild(am4core.Label);
+    titleHum.fontSize = 20;
+    titleHum.horizontalCenter = 'middle';
+    titleHum.y = am4core.percent(100);
+
+    // Guardar referencia
+    gaugeHumRef.current = gaugeHum;
 
     // Limpieza en caso de que el componente se desmonte
     return () => {
@@ -341,8 +454,14 @@ const Station = () => {
       if (chartHum) {
         chartHum.dispose();
       }
+      if (gaugeTemp) {
+        gaugeTemp.dispose();
+      }
+      if (gaugeHum) {
+        gaugeHum.dispose();
+      }
     };
-  }, [datosEstacion, tempMax, tempMin, humMax, humMin]);
+  }, [datosEstacion, tempMax, tempMin, humMax, humMin, currentTemperature, currentHumidity]);
 
   return (
     <div className="container mt-4 panel-control-container">
@@ -365,12 +484,12 @@ const Station = () => {
 
           {/* Mapa con Leaflet */}
           <div className="map-container">
-            <div id="map-leaflet" />
+            <div id="map-leaflet" style={{ height: '300px', width: '100%' }} />
           </div>
         </div>
       )}
 
-      {/* Tarjetas de Temperatura y Humedad actuales */}
+      {/* Gauges de Temperatura y Humedad */}
       <div className="row mt-4">
         <div className="col-md-6">
           <div className="card text-center">
@@ -378,6 +497,7 @@ const Station = () => {
               <h4>Temperatura Actual</h4>
             </div>
             <div className="card-body">
+              <div id="gaugeTemperatura" style={{ width: '100%', height: '200px' }}></div>
               <p className="display-4">
                 {currentTemperature !== null ? `${currentTemperature} °C` : '--'}
               </p>
@@ -390,6 +510,7 @@ const Station = () => {
               <h4>Humedad Actual</h4>
             </div>
             <div className="card-body">
+              <div id="gaugeHumedad" style={{ width: '100%', height: '200px' }}></div>
               <p className="display-4">
                 {currentHumidity !== null ? `${currentHumidity} %` : '--'}
               </p>
