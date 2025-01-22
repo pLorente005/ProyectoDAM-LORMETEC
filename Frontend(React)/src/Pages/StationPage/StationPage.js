@@ -75,9 +75,24 @@ const Station = () => {
   // Referencia para el globo de “Horas Sol” (amCharts 5)
   const chartSunRef = useRef(null);
 
-  // Nuevas referencias para los gauges
+  // Referencias para los gauges
   const gaugeTempRef = useRef(null);
   const gaugeHumRef = useRef(null);
+
+  // ==============================
+  // PRONÓSTICO DE OPENWEATHER
+  // ==============================
+  // Estado para almacenar los datos devueltos por OpenWeather
+  const [forecastData, setForecastData] = useState(null);
+
+  // Estado para el rango de pronóstico seleccionado ("3h", "24h", "5d")
+  const [forecastRange, setForecastRange] = useState('24h');
+
+  // Estado para la precipitación acumulada en el rango
+  const [accumulatedPrecip, setAccumulatedPrecip] = useState(0);
+
+  // Referencia para el gauge de precipitación
+  const gaugePrecipRef = useRef(null);
 
   // Estados para controlar los acordeones
   const [isFechaHoraOpen, setIsFechaHoraOpen] = useState(true);
@@ -130,7 +145,7 @@ const Station = () => {
 
         setAlerta(null);
       } else if (response.status === 401) {
-        // Usuario no autenticado, redirigir a login (si corresponde)
+        // Usuario no autenticado, redirigir a login
         navigate('/login');
       } else {
         setAlerta({
@@ -143,7 +158,7 @@ const Station = () => {
     }
   };
 
-  // Efecto para cargar datos cuando cambian serialNumber, fecha u hora
+  // Efecto para cargar datos de la estación cuando cambian serialNumber, fecha u hora
   useEffect(() => {
     if (serialNumber) {
       cargarDatos();
@@ -199,12 +214,71 @@ const Station = () => {
     navigate(`/estacion?${params.toString()}`);
   };
 
-  /**
-   * Efecto que construye (o reconstruye) los gráficos
-   * cuando cambian los datos de la estación o la zona horaria.
-   */
+  // ======================================================
+  //  1) Llamar a OpenWeather con las coordenadas de la estación
+  // ======================================================
   useEffect(() => {
-    // Si no hay datos, destruimos los charts si existen y salimos.
+    // Solo llamamos a OpenWeather si tenemos lat y lon
+    if (!latitude || !longitude) return;
+
+    const fetchPrecipitaciones = async () => {
+      try {
+        const response = await fetch(
+          `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=6891f6c960906bd04a593509675aeb2d`
+        );
+        const data = await response.json();
+        setForecastData(data);
+      } catch (error) {
+        console.error('Error al obtener datos de OpenWeather:', error);
+      }
+    };
+
+    fetchPrecipitaciones();
+  }, [latitude, longitude]);
+
+  // ======================================================
+  //  2) Calcular la precipitación acumulada según forecastRange
+  //     (3 horas, 24 horas o 5 días [máx. 5 días que da la API]).
+  // ======================================================
+  useEffect(() => {
+    if (!forecastData || !forecastData.list) {
+      setAccumulatedPrecip(0);
+      return;
+    }
+
+    let sum = 0;
+    let intervalsNeeded = 0;
+
+    // Cada intervalo de "list" son 3 horas. 
+    // - 3h -> 1 intervalo
+    // - 24h -> 8 intervalos (8 x 3 = 24)
+    // - 5d -> ~40 intervalos (la API da 5 días, 3h c/u => 8 x 5 = 40)
+    switch (forecastRange) {
+      case '3h':
+        intervalsNeeded = 1;
+        break;
+      case '24h':
+        intervalsNeeded = 8;
+        break;
+      case '5d':
+        intervalsNeeded = forecastData.list.length; // normalmente 40
+        break;
+      default:
+        intervalsNeeded = 8; // fallback
+    }
+
+    for (let i = 0; i < intervalsNeeded && i < forecastData.list.length; i++) {
+      sum += forecastData.list[i].rain?.['3h'] ?? 0;
+    }
+
+    setAccumulatedPrecip(sum);
+  }, [forecastData, forecastRange]);
+
+  // ======================================================
+  //  3) Construir/Actualizar todos los gráficos amCharts 4 y 5
+  // ======================================================
+  useEffect(() => {
+    // Si no hay datos de la estación, destruir gráficos si existen.
     if (!datosEstacion || datosEstacion.length === 0) {
       if (chartTempRef.current) {
         chartTempRef.current.dispose();
@@ -226,44 +300,36 @@ const Station = () => {
         gaugeHumRef.current.dispose();
         gaugeHumRef.current = null;
       }
+      if (gaugePrecipRef.current) {
+        gaugePrecipRef.current.dispose();
+        gaugePrecipRef.current = null;
+      }
       return;
     }
 
-    // Destruir instancias previas para evitar fugas de memoria (amCharts 4)
-    if (chartTempRef.current) {
-      chartTempRef.current.dispose();
-    }
-    if (chartHumRef.current) {
-      chartHumRef.current.dispose();
-    }
-
-    // Destruir el globo amCharts 5 si existía
+    // Destruir instancias previas para evitar fugas de memoria
+    if (chartTempRef.current) chartTempRef.current.dispose();
+    if (chartHumRef.current) chartHumRef.current.dispose();
     if (chartSunRef.current) {
       chartSunRef.current.dispose();
       chartSunRef.current = null;
     }
+    if (gaugeTempRef.current) gaugeTempRef.current.dispose();
+    if (gaugeHumRef.current) gaugeHumRef.current.dispose();
+    if (gaugePrecipRef.current) gaugePrecipRef.current.dispose();
 
-    // Destruir gauges previos
-    if (gaugeTempRef.current) {
-      gaugeTempRef.current.dispose();
-    }
-    if (gaugeHumRef.current) {
-      gaugeHumRef.current.dispose();
-    }
-
-    // ---- Preparar datos para los gráficos de amCharts 4 ----
+    // ---- Preparar datos para los gráficos de amCharts 4 (Temp y Hum) ----
     const chartData = datosEstacion.map(dato => ({
-      timestamp: new Date(dato.timestamp + 'Z'), // Ajusta el timestamp como UTC
+      timestamp: new Date(dato.timestamp + 'Z'),
       temperature: Number(dato.temperature),
       humidity: Number(dato.humidity)
     }));
 
     // ======================================================
-    //                 GRÁFICO DE TEMPERATURA (amCharts 4)
+    //   GRÁFICO DE TEMPERATURA (amCharts 4)
     // ======================================================
     const chartTemp = am4core.create('graficoTemperatura', am4charts.XYChart);
     chartTemp.data = chartData;
-
     if (infoEstacion?.timezone) {
       chartTemp.dateFormatter.timezone = infoEstacion.timezone;
     }
@@ -320,11 +386,10 @@ const Station = () => {
     chartTempRef.current = chartTemp;
 
     // ======================================================
-    //                 GRÁFICO DE HUMEDAD (amCharts 4)
+    //   GRÁFICO DE HUMEDAD (amCharts 4)
     // ======================================================
     const chartHum = am4core.create('graficoHumedad', am4charts.XYChart);
     chartHum.data = chartData;
-
     if (infoEstacion?.timezone) {
       chartHum.dateFormatter.timezone = infoEstacion.timezone;
     }
@@ -380,21 +445,19 @@ const Station = () => {
     chartHumRef.current = chartHum;
 
     // ======================================================
-    //         GLOBO DÍA/NOCHE (amCharts 5) - “graficoHorasSol”
+    //   GLOBO DÍA/NOCHE (amCharts 5) - “graficoHorasSol”
     // ======================================================
-
-    // Creamos la raíz de amCharts 5
     const rootSun = am5.Root.new('graficoHorasSol');
-    rootSun.setThemes([ am5themes_Animated.new(rootSun) ]);
+    rootSun.setThemes([am5themes_Animated.new(rootSun)]);
 
-    // Configuramos el MapChart con proyección ortográfica
-    const chartSun = rootSun.container.children.push(am5map.MapChart.new(rootSun, {
-      panX: 'rotateX',
-      panY: 'rotateY',
-      projection: am5map.geoOrthographic()
-    }));
+    const chartSun = rootSun.container.children.push(
+      am5map.MapChart.new(rootSun, {
+        panX: 'rotateX',
+        panY: 'rotateY',
+        projection: am5map.geoOrthographic()
+      })
+    );
 
-    // Serie de polígonos para el fondo
     const backgroundSeries = chartSun.series.push(am5map.MapPolygonSeries.new(rootSun, {}));
     backgroundSeries.mapPolygons.template.setAll({
       fill: rootSun.interfaceColors.get('alternativeBackground'),
@@ -405,15 +468,14 @@ const Station = () => {
       geometry: am5map.getGeoRectangle(90, 180, -90, -180)
     });
 
-    // Serie de polígonos con el mapa del mundo
-    const polygonSeries = chartSun.series.push(am5map.MapPolygonSeries.new(rootSun, {
-      geoJSON: am5geodata_worldLow
-    }));
+    const polygonSeries = chartSun.series.push(
+      am5map.MapPolygonSeries.new(rootSun, {
+        geoJSON: am5geodata_worldLow
+      })
+    );
 
-    // Serie de puntos para el Sol (halo animado)
     const sunSeries = chartSun.series.push(am5map.MapPointSeries.new(rootSun, {}));
-
-    // Primer bullet (halo)
+    // Halo
     sunSeries.bullets.push(() => {
       let circle = am5.Circle.new(rootSun, {
         radius: 18,
@@ -429,8 +491,7 @@ const Station = () => {
       });
       return am5.Bullet.new(rootSun, { sprite: circle });
     });
-
-    // Segundo bullet (bolita)
+    // Bolita
     sunSeries.bullets.push(() => {
       return am5.Bullet.new(rootSun, {
         sprite: am5.Circle.new(rootSun, {
@@ -440,10 +501,8 @@ const Station = () => {
       });
     });
 
-    // DataItem para posicionar el Sol
     const sunDataItem = sunSeries.pushDataItem({});
 
-    // Serie de polígonos para la zona de noche
     const nightSeries = chartSun.series.push(am5map.MapPolygonSeries.new(rootSun, {}));
     nightSeries.mapPolygons.template.setAll({
       fill: am5.color(0x000000),
@@ -455,7 +514,6 @@ const Station = () => {
     const nightDataItem1 = nightSeries.pushDataItem({});
     const nightDataItem2 = nightSeries.pushDataItem({});
 
-    // Función para actualizar posición del Sol y zona de noche
     function updateDayNight(time) {
       let sunPos = solarPosition(time);
       sunDataItem.set('longitude', sunPos.longitude);
@@ -471,15 +529,10 @@ const Station = () => {
       nightDataItem2.set('geometry', am5map.getGeoCircle(nightPos, 88));
     }
 
-    // Llamamos una vez ahora
     updateDayNight(Date.now());
 
-    // (Opcional) Actualizar cada minuto para que el Sol se mueva con el tiempo real
-    // const interval = setInterval(() => {
-    //   updateDayNight(Date.now());
-    // }, 60000);
+    chartSunRef.current = rootSun;
 
-    // Funciones de cálculo astronómico (NOAA’s Solar Calculator)
     function solarPosition(time) {
       let centuries = (time - Date.UTC(2000, 0, 1, 12)) / 864e5 / 36525;
       let longitude = ((am5.time.round(new Date(time), 'day', 1).getTime() - time) / 864e5) * 360 - 180;
@@ -490,10 +543,10 @@ const Station = () => {
     }
 
     function equationOfTime(centuries) {
-      let e = eccentricityEarthOrbit(centuries),
-          m = solarGeometricMeanAnomaly(centuries),
-          l = solarGeometricMeanLongitude(centuries),
-          y = Math.tan(obliquityCorrection(centuries) / 2);
+      let e = eccentricityEarthOrbit(centuries);
+      let m = solarGeometricMeanAnomaly(centuries);
+      let l = solarGeometricMeanLongitude(centuries);
+      let y = Math.tan(obliquityCorrection(centuries) / 2);
       y *= y;
       return (
         y * Math.sin(2 * l) -
@@ -507,7 +560,7 @@ const Station = () => {
     function solarDeclination(centuries) {
       return Math.asin(
         Math.sin(obliquityCorrection(centuries)) *
-        Math.sin(solarApparentLongitude(centuries))
+          Math.sin(solarApparentLongitude(centuries))
       );
     }
 
@@ -522,10 +575,7 @@ const Station = () => {
     }
 
     function solarTrueLongitude(centuries) {
-      return (
-        solarGeometricMeanLongitude(centuries) +
-        solarEquationOfCenter(centuries)
-      );
+      return solarGeometricMeanLongitude(centuries) + solarEquationOfCenter(centuries);
     }
 
     function solarGeometricMeanAnomaly(centuries) {
@@ -576,29 +626,26 @@ const Station = () => {
       return 0.016708634 - centuries * (0.000042037 + 0.0000001267 * centuries);
     }
 
-    // Guardamos la referencia para destruirlo luego
-    chartSunRef.current = rootSun;
-
     // ======================================================
-    //                 CALCULAR HORAS DE SOL CON SunCalc
+    //   CALCULAR HORAS DE SOL CON SunCalc
     // ======================================================
     if (latitude != null && longitude != null) {
       const times = SunCalc.getTimes(new Date(), latitude, longitude);
       const sunrise = times.sunrise;
       const sunset = times.sunset;
-
-      // Formatear las horas
-      const formatTime = (date) => {
-        return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
-      };
+      const formatTime = (date) =>
+        date.getHours().toString().padStart(2, '0') +
+        ':' +
+        date.getMinutes().toString().padStart(2, '0');
 
       setSunriseTime(formatTime(sunrise));
       setSunsetTime(formatTime(sunset));
     }
 
     // ======================================================
-    //                 GAUGES DE TEMPERATURA Y HUMEDAD (amCharts 4)
+    //   GAUGES DE TEMPERATURA Y HUMEDAD (amCharts 4)
     // ======================================================
+    // Temperatura
     const gaugeTemp = am4core.create('gaugeTemperatura', am4charts.GaugeChart);
     gaugeTemp.innerRadius = am4core.percent(82);
 
@@ -606,8 +653,6 @@ const Station = () => {
     axisTemp.min = -20;
     axisTemp.max = 80;
     axisTemp.strictMinMax = true;
-    axisTemp.renderer.axisFills.template.fill = am4core.color('#fff');
-    axisTemp.renderer.labels.template.fill = am4core.color('#000');
 
     const tempLowEnd = tempMin !== null ? tempMin : 0;
     const tempMidEnd = tempMax !== null ? tempMax : 50;
@@ -635,6 +680,7 @@ const Station = () => {
 
     gaugeTempRef.current = gaugeTemp;
 
+    // Humedad
     const gaugeHum = am4core.create('gaugeHumedad', am4charts.GaugeChart);
     gaugeHum.innerRadius = am4core.percent(82);
 
@@ -642,8 +688,6 @@ const Station = () => {
     axisHum.min = 0;
     axisHum.max = 100;
     axisHum.strictMinMax = true;
-    axisHum.renderer.axisFills.template.fill = am4core.color('#fff');
-    axisHum.renderer.labels.template.fill = am4core.color('#000');
 
     const humLowEnd = humMin !== null ? humMin : 30;
     const humMidEnd = humMax !== null ? humMax : 60;
@@ -671,28 +715,55 @@ const Station = () => {
 
     gaugeHumRef.current = gaugeHum;
 
-    // Limpieza en caso de que el componente se desmonte
+    // ======================================================
+    //   GAUGE DE PRECIPITACIÓN (amCharts 4)
+    // ======================================================
+    const gaugePrecip = am4core.create('gaugePrecipitacion', am4charts.GaugeChart);
+    gaugePrecip.innerRadius = am4core.percent(82);
+
+    const axisPrecip = gaugePrecip.xAxes.push(new am4charts.ValueAxis());
+    axisPrecip.min = 0;
+    axisPrecip.max = 50; // Ajusta el máximo a lo que consideres razonable
+    axisPrecip.strictMinMax = true;
+
+    // Rango "bajo" de precipitación
+    const rangePrecipLow = axisPrecip.axisRanges.create();
+    rangePrecipLow.value = 0;
+    rangePrecipLow.endValue = 10;
+    rangePrecipLow.axisFill.fill = am4core.color('#00FF00');
+    rangePrecipLow.axisFill.fillOpacity = 1;
+
+    // Rango "medio"
+    const rangePrecipMid = axisPrecip.axisRanges.create();
+    rangePrecipMid.value = 10;
+    rangePrecipMid.endValue = 30;
+    rangePrecipMid.axisFill.fill = am4core.color('#FFFF00');
+    rangePrecipMid.axisFill.fillOpacity = 1;
+
+    // Rango "alto"
+    const rangePrecipHigh = axisPrecip.axisRanges.create();
+    rangePrecipHigh.value = 30;
+    rangePrecipHigh.endValue = axisPrecip.max;
+    rangePrecipHigh.axisFill.fill = am4core.color('#FF0000');
+    rangePrecipHigh.axisFill.fillOpacity = 1;
+
+    const handPrecip = gaugePrecip.hands.push(new am4charts.ClockHand());
+    // Usamos 'accumulatedPrecip' como valor:
+    handPrecip.value = accumulatedPrecip;
+
+    gaugePrecipRef.current = gaugePrecip;
+
+    // Limpieza
     return () => {
-      // Destruir gráficos amCharts 4
-      if (chartTemp) {
-        chartTemp.dispose();
-      }
-      if (chartHum) {
-        chartHum.dispose();
-      }
-      if (gaugeTemp) {
-        gaugeTemp.dispose();
-      }
-      if (gaugeHum) {
-        gaugeHum.dispose();
-      }
-      // Destruir globo amCharts 5
+      if (chartTemp) chartTemp.dispose();
+      if (chartHum) chartHum.dispose();
+      if (gaugeTemp) gaugeTemp.dispose();
+      if (gaugeHum) gaugeHum.dispose();
       if (chartSunRef.current) {
         chartSunRef.current.dispose();
         chartSunRef.current = null;
       }
-      // Si usaste setInterval para updateDayNight, limpialo:
-      // clearInterval(interval);
+      if (gaugePrecip) gaugePrecip.dispose();
     };
   }, [
     datosEstacion,
@@ -704,7 +775,8 @@ const Station = () => {
     currentHumidity,
     infoEstacion?.timezone,
     latitude,
-    longitude
+    longitude,
+    accumulatedPrecip
   ]);
 
   // Calcular clases condicionales para las cards
@@ -721,6 +793,17 @@ const Station = () => {
     (currentHumidity > humMax || currentHumidity < humMin)
       ? 'light-red-bg'
       : '';
+
+  // Mensajes según la precipitación acumulada
+  const isNoRain = accumulatedPrecip === 0;
+
+  // Para mostrar texto debajo del gauge de precipitación
+  const rangeText =
+    forecastRange === '3h'
+      ? 'En las próximas 3 horas'
+      : forecastRange === '24h'
+      ? 'En las próximas 24 horas'
+      : 'En los próximos 5 días';
 
   return (
     <div className="container mt-4 panel-control-container">
@@ -778,7 +861,7 @@ const Station = () => {
         </div>
       </div>
 
-      {/* Nueva Tarjeta: Horas Sol (con amCharts 5) */}
+      {/* Tarjeta: Horas Sol (amCharts 5) */}
       {latitude && longitude && (
         <div className="row mt-4">
           <div className="col-md-6">
@@ -787,7 +870,6 @@ const Station = () => {
                 <h4>Horas Sol</h4>
               </div>
               <div className="card-body">
-                {/* Globo Día/Noche de amCharts 5 */}
                 <div
                   id="graficoHorasSol"
                   style={{ width: '100%', height: '300px', margin: '0 auto' }}
@@ -796,15 +878,71 @@ const Station = () => {
               <div className="row">
                 <div className="col">
                   <p>
-                    <span style={{ fontSize: '24px' }}>&#9650;</span> {/* Flecha hacia arriba */}
+                    <span style={{ fontSize: '24px' }}>&#9650;</span>{' '}
                     <span id="sunriseTime">{sunriseTime}</span>
                   </p>
                 </div>
                 <div className="col">
                   <p>
-                    <span style={{ fontSize: '24px' }}>&#9660;</span> {/* Flecha hacia abajo */}
+                    <span style={{ fontSize: '24px' }}>&#9660;</span>{' '}
                     <span id="sunsetTime">{sunsetTime}</span>
                   </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tarjeta: Precipitación acumulada según rango */}
+      {forecastData && forecastData.list && (
+        <div className="row mt-4">
+          <div className="col-md-6">
+            <div className="card text-center">
+              <div className="card-header bg-info text-white">
+                <h4>Precipitación</h4>
+              </div>
+              <div className="card-body">
+                {/* Gauge de precipitación */}
+                <div id="gaugePrecipitacion" style={{ width: '100%', height: '200px' }}></div>
+
+                {/* Valor en mm */}
+                <p className="display-4">
+                  {accumulatedPrecip.toFixed(2)} mm
+                </p>
+                <p>{rangeText}</p>
+
+                {/* Mensajito según si hay o no lluvia */}
+                <div className="row">
+                  <div className="col">
+                    {isNoRain ? (
+                      <p>
+                        <span className="text-success">Sin precipitaciones 😊</span>
+                      </p>
+                    ) : (
+                      <p>
+                        <span className="text-warning">Se espera lluvia 😅</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <p>
+                  Las precipitaciones de hoy han sido{' '}
+                  {isNoRain ? 'nulas en comparación con días anteriores.' : 'similares a las anteriores.'}
+                </p>
+
+                {/* Selector de rango */}
+                <div className="form-group">
+                  <label>Rango de Pronóstico:</label>
+                  <select
+                    className="form-control"
+                    value={forecastRange}
+                    onChange={(e) => setForecastRange(e.target.value)}
+                  >
+                    <option value="3h">Próximas 3 horas</option>
+                    <option value="24h">Próximas 24 horas</option>
+                    <option value="5d">Próximos 5 días</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -825,9 +963,7 @@ const Station = () => {
                 style={{ textDecoration: 'none' }}
               >
                 Seleccionar Fecha y Hora
-                <span className="float-right">
-                  {isFechaHoraOpen ? '-' : '+'}
-                </span>
+                <span className="float-right">{isFechaHoraOpen ? '-' : '+'}</span>
               </button>
             </h2>
           </div>
@@ -883,9 +1019,7 @@ const Station = () => {
                 style={{ textDecoration: 'none' }}
               >
                 Mostrar Datos de la Estación
-                <span className="float-right">
-                  {isDatosOpen ? '-' : '+'}
-                </span>
+                <span className="float-right">{isDatosOpen ? '-' : '+'}</span>
               </button>
             </h2>
           </div>
