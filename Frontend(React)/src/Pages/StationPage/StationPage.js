@@ -218,23 +218,37 @@ const Station = () => {
   //  1) Llamar a OpenWeather con las coordenadas de la estación
   // ======================================================
   useEffect(() => {
-    // Solo llamamos a OpenWeather si tenemos lat y lon
+    // Solo llamamos al servidor PHP si tenemos lat y lon
     if (!latitude || !longitude) return;
 
     const fetchPrecipitaciones = async () => {
       try {
-        const response = await fetch(
-          `https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=6891f6c960906bd04a593509675aeb2d`
-        );
+        const response = await fetch('api/get-weather.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            latitude,
+            longitude,
+          }),
+        });
+
         const data = await response.json();
-        setForecastData(data);
+
+        if (data.error) {
+          console.error('Error al obtener los datos:', data.error);
+          setForecastData(null);  
+        } else {
+          setForecastData(data);  
+        }
       } catch (error) {
-        console.error('Error al obtener datos de OpenWeather:', error);
+        console.error('Error al conectar con el servidor:', error);
       }
     };
 
     fetchPrecipitaciones();
-  }, [latitude, longitude]);
+  }, [latitude, longitude]);  // Vuelve a ejecutar el efecto si las coordenadas cambian
 
   // ======================================================
   //  2) Calcular la precipitación acumulada según forecastRange
@@ -904,7 +918,10 @@ const Station = () => {
               </div>
               <div className="card-body">
                 {/* Gauge de precipitación */}
-                <div id="gaugePrecipitacion" style={{ width: '100%', height: '200px' }}></div>
+                <div 
+                  id="gaugePrecipitacion" 
+                  style={{ width: '100%', height: '200px', marginTop: '5px' }}  
+                ></div>
 
                 {/* Valor en mm */}
                 <p className="display-4">
