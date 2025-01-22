@@ -8,8 +8,14 @@ import * as am4core from '@amcharts/amcharts4/core';
 import * as am4charts from '@amcharts/amcharts4/charts';
 import am4themes_animated from '@amcharts/amcharts4/themes/animated';
 
-// Aplicamos el tema animado de amCharts
+// Aplicamos el tema animado de amCharts 4
 am4core.useTheme(am4themes_animated);
+
+// ---- amCharts 5 (para el globo terráqueo) ----
+import * as am5 from '@amcharts/amcharts5';
+import * as am5map from '@amcharts/amcharts5/map';
+import am5themes_Animated from '@amcharts/amcharts5/themes/Animated';
+import am5geodata_worldLow from '@amcharts/amcharts5-geodata/worldLow';
 
 // Iconos de Leaflet
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -23,6 +29,9 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
+
+// Importar SunCalc
+import SunCalc from 'suncalc';
 
 import PageTitle from '../../components/PageTitle/PageTitle';
 import './StationPage.css';
@@ -55,9 +64,16 @@ const Station = () => {
   const [longitude, setLongitude] = useState(null);
   const [map, setMap] = useState(null);
 
+  // Nuevos estados para las horas de sol
+  const [sunriseTime, setSunriseTime] = useState('--:--');
+  const [sunsetTime, setSunsetTime] = useState('--:--');
+
   // Referencias a los gráficos (para destruirlos al recargar datos)
   const chartTempRef = useRef(null);
   const chartHumRef = useRef(null);
+
+  // Referencia para el globo de “Horas Sol” (amCharts 5)
+  const chartSunRef = useRef(null);
 
   // Nuevas referencias para los gauges
   const gaugeTempRef = useRef(null);
@@ -184,8 +200,8 @@ const Station = () => {
   };
 
   /**
-   * Efecto que construye (o reconstruye) los dos gráficos 
-   * cuando cambian los datos de la estación.
+   * Efecto que construye (o reconstruye) los gráficos
+   * cuando cambian los datos de la estación o la zona horaria.
    */
   useEffect(() => {
     // Si no hay datos, destruimos los charts si existen y salimos.
@@ -198,7 +214,10 @@ const Station = () => {
         chartHumRef.current.dispose();
         chartHumRef.current = null;
       }
-      // También destruimos los gauges si existen
+      if (chartSunRef.current) {
+        chartSunRef.current.dispose();
+        chartSunRef.current = null;
+      }
       if (gaugeTempRef.current) {
         gaugeTempRef.current.dispose();
         gaugeTempRef.current = null;
@@ -210,13 +229,20 @@ const Station = () => {
       return;
     }
 
-    // Destruir instancias previas para evitar fugas de memoria
+    // Destruir instancias previas para evitar fugas de memoria (amCharts 4)
     if (chartTempRef.current) {
       chartTempRef.current.dispose();
     }
     if (chartHumRef.current) {
       chartHumRef.current.dispose();
     }
+
+    // Destruir el globo amCharts 5 si existía
+    if (chartSunRef.current) {
+      chartSunRef.current.dispose();
+      chartSunRef.current = null;
+    }
+
     // Destruir gauges previos
     if (gaugeTempRef.current) {
       gaugeTempRef.current.dispose();
@@ -225,32 +251,33 @@ const Station = () => {
       gaugeHumRef.current.dispose();
     }
 
-    // ---- Preparar datos para los gráficos ----
+    // ---- Preparar datos para los gráficos de amCharts 4 ----
     const chartData = datosEstacion.map(dato => ({
-      // Ajusta el timestamp si es necesario para interpretarlo como UTC
-      timestamp: new Date(dato.timestamp + 'Z'),
+      timestamp: new Date(dato.timestamp + 'Z'), // Ajusta el timestamp como UTC
       temperature: Number(dato.temperature),
       humidity: Number(dato.humidity)
     }));
 
     // ======================================================
-    //                 GRÁFICO DE TEMPERATURA
+    //                 GRÁFICO DE TEMPERATURA (amCharts 4)
     // ======================================================
     const chartTemp = am4core.create('graficoTemperatura', am4charts.XYChart);
     chartTemp.data = chartData;
 
+    if (infoEstacion?.timezone) {
+      chartTemp.dateFormatter.timezone = infoEstacion.timezone;
+    }
+
     // Eje X (fecha-hora)
     const dateAxisTemp = chartTemp.xAxes.push(new am4charts.DateAxis());
     dateAxisTemp.title.text = 'Fecha y Hora';
+    dateAxisTemp.tooltipDateFormat = 'dd/MM/yyyy HH:mm:ss';
 
     // Eje Y (temperatura)
     const valueAxisTemp = chartTemp.yAxes.push(new am4charts.ValueAxis());
     valueAxisTemp.title.text = 'Temperatura (°C)';
-    // Limitar eje de temperatura entre -20 y 80
     valueAxisTemp.min = -20;
     valueAxisTemp.max = 80;
-
-    // Ajustar el valor base para el área sombreada
     valueAxisTemp.baseValue = -20;
 
     // Serie de Temperatura
@@ -260,7 +287,6 @@ const Station = () => {
     seriesTemp.name = 'Temperatura (°C)';
     seriesTemp.strokeWidth = 2;
     seriesTemp.tooltipText = '{valueY} °C';
-    // Colores
     seriesTemp.stroke = am4core.color('rgba(255, 99, 132, 1)');
     seriesTemp.fillOpacity = 0.2;
     seriesTemp.fill = am4core.color('rgba(255, 99, 132, 0.2)');
@@ -269,7 +295,7 @@ const Station = () => {
     chartTemp.cursor = new am4charts.XYCursor();
     chartTemp.cursor.xAxis = dateAxisTemp;
 
-    // Líneas de referencia: Temp Max
+    // Líneas de referencia (Temp Max/Min)
     if (tempMax != null) {
       const rangeMaxTemp = valueAxisTemp.axisRanges.create();
       rangeMaxTemp.value = tempMax;
@@ -280,7 +306,6 @@ const Station = () => {
       rangeMaxTemp.label.fill = am4core.color('#FF0000');
       rangeMaxTemp.label.verticalCenter = 'bottom';
     }
-    // Líneas de referencia: Temp Min
     if (tempMin != null) {
       const rangeMinTemp = valueAxisTemp.axisRanges.create();
       rangeMinTemp.value = tempMin;
@@ -292,26 +317,29 @@ const Station = () => {
       rangeMinTemp.label.verticalCenter = 'top';
     }
 
-    // Guardar referencia para destruirlo después
     chartTempRef.current = chartTemp;
 
     // ======================================================
-    //                 GRÁFICO DE HUMEDAD
+    //                 GRÁFICO DE HUMEDAD (amCharts 4)
     // ======================================================
     const chartHum = am4core.create('graficoHumedad', am4charts.XYChart);
     chartHum.data = chartData;
 
+    if (infoEstacion?.timezone) {
+      chartHum.dateFormatter.timezone = infoEstacion.timezone;
+    }
+
     // Eje X (fecha-hora)
     const dateAxisHum = chartHum.xAxes.push(new am4charts.DateAxis());
     dateAxisHum.title.text = 'Fecha y Hora';
+    dateAxisHum.tooltipDateFormat = 'dd/MM/yyyy HH:mm:ss';
 
     // Eje Y (humedad)
     const valueAxisHum = chartHum.yAxes.push(new am4charts.ValueAxis());
     valueAxisHum.title.text = 'Humedad (%)';
-    // Limitar eje de humedad entre 0 y 100
     valueAxisHum.min = 0;
     valueAxisHum.max = 100;
-    
+
     // Serie de Humedad
     const seriesHum = chartHum.series.push(new am4charts.LineSeries());
     seriesHum.dataFields.valueY = 'humidity';
@@ -319,7 +347,6 @@ const Station = () => {
     seriesHum.name = 'Humedad (%)';
     seriesHum.strokeWidth = 2;
     seriesHum.tooltipText = '{valueY} %';
-    // Colores
     seriesHum.stroke = am4core.color('rgba(54, 162, 235, 1)');
     seriesHum.fillOpacity = 0.2;
     seriesHum.fill = am4core.color('rgba(54, 162, 235, 0.2)');
@@ -328,7 +355,7 @@ const Station = () => {
     chartHum.cursor = new am4charts.XYCursor();
     chartHum.cursor.xAxis = dateAxisHum;
 
-    // Líneas de referencia: Hum Max
+    // Líneas de referencia (Hum Max/Min)
     if (humMax != null) {
       const rangeMaxHum = valueAxisHum.axisRanges.create();
       rangeMaxHum.value = humMax;
@@ -339,7 +366,6 @@ const Station = () => {
       rangeMaxHum.label.fill = am4core.color('#FF0000');
       rangeMaxHum.label.verticalCenter = 'bottom';
     }
-    // Líneas de referencia: Hum Min
     if (humMin != null) {
       const rangeMinHum = valueAxisHum.axisRanges.create();
       rangeMinHum.value = humMin;
@@ -351,121 +377,303 @@ const Station = () => {
       rangeMinHum.label.verticalCenter = 'top';
     }
 
-    // Guardar referencia para destruirlo después
     chartHumRef.current = chartHum;
 
     // ======================================================
-    //                 GAUGES DE TEMPERATURA Y HUMEDAD
+    //         GLOBO DÍA/NOCHE (amCharts 5) - “graficoHorasSol”
     // ======================================================
 
-    // --------------------
-    // Gauge de Temperatura
-    // --------------------
+    // Creamos la raíz de amCharts 5
+    const rootSun = am5.Root.new('graficoHorasSol');
+    rootSun.setThemes([ am5themes_Animated.new(rootSun) ]);
+
+    // Configuramos el MapChart con proyección ortográfica
+    const chartSun = rootSun.container.children.push(am5map.MapChart.new(rootSun, {
+      panX: 'rotateX',
+      panY: 'rotateY',
+      projection: am5map.geoOrthographic()
+    }));
+
+    // Serie de polígonos para el fondo
+    const backgroundSeries = chartSun.series.push(am5map.MapPolygonSeries.new(rootSun, {}));
+    backgroundSeries.mapPolygons.template.setAll({
+      fill: rootSun.interfaceColors.get('alternativeBackground'),
+      fillOpacity: 0,
+      strokeOpacity: 0
+    });
+    backgroundSeries.data.push({
+      geometry: am5map.getGeoRectangle(90, 180, -90, -180)
+    });
+
+    // Serie de polígonos con el mapa del mundo
+    const polygonSeries = chartSun.series.push(am5map.MapPolygonSeries.new(rootSun, {
+      geoJSON: am5geodata_worldLow
+    }));
+
+    // Serie de puntos para el Sol (halo animado)
+    const sunSeries = chartSun.series.push(am5map.MapPointSeries.new(rootSun, {}));
+
+    // Primer bullet (halo)
+    sunSeries.bullets.push(() => {
+      let circle = am5.Circle.new(rootSun, {
+        radius: 18,
+        fill: am5.color(0xffba00),
+        filter: 'blur(5px)'
+      });
+      circle.animate({
+        key: 'radius',
+        duration: 2000,
+        to: 23,
+        loops: Infinity,
+        easing: am5.ease.yoyo(am5.ease.linear)
+      });
+      return am5.Bullet.new(rootSun, { sprite: circle });
+    });
+
+    // Segundo bullet (bolita)
+    sunSeries.bullets.push(() => {
+      return am5.Bullet.new(rootSun, {
+        sprite: am5.Circle.new(rootSun, {
+          radius: 14,
+          fill: am5.color(0xffba00)
+        })
+      });
+    });
+
+    // DataItem para posicionar el Sol
+    const sunDataItem = sunSeries.pushDataItem({});
+
+    // Serie de polígonos para la zona de noche
+    const nightSeries = chartSun.series.push(am5map.MapPolygonSeries.new(rootSun, {}));
+    nightSeries.mapPolygons.template.setAll({
+      fill: am5.color(0x000000),
+      fillOpacity: 0.25,
+      strokeOpacity: 0
+    });
+
+    const nightDataItem0 = nightSeries.pushDataItem({});
+    const nightDataItem1 = nightSeries.pushDataItem({});
+    const nightDataItem2 = nightSeries.pushDataItem({});
+
+    // Función para actualizar posición del Sol y zona de noche
+    function updateDayNight(time) {
+      let sunPos = solarPosition(time);
+      sunDataItem.set('longitude', sunPos.longitude);
+      sunDataItem.set('latitude', sunPos.latitude);
+
+      let nightPos = {
+        longitude: sunPos.longitude + 180,
+        latitude: -sunPos.latitude
+      };
+
+      nightDataItem0.set('geometry', am5map.getGeoCircle(nightPos, 92));
+      nightDataItem1.set('geometry', am5map.getGeoCircle(nightPos, 90));
+      nightDataItem2.set('geometry', am5map.getGeoCircle(nightPos, 88));
+    }
+
+    // Llamamos una vez ahora
+    updateDayNight(Date.now());
+
+    // (Opcional) Actualizar cada minuto para que el Sol se mueva con el tiempo real
+    // const interval = setInterval(() => {
+    //   updateDayNight(Date.now());
+    // }, 60000);
+
+    // Funciones de cálculo astronómico (NOAA’s Solar Calculator)
+    function solarPosition(time) {
+      let centuries = (time - Date.UTC(2000, 0, 1, 12)) / 864e5 / 36525;
+      let longitude = ((am5.time.round(new Date(time), 'day', 1).getTime() - time) / 864e5) * 360 - 180;
+      return am5map.normalizeGeoPoint({
+        longitude: longitude - equationOfTime(centuries) * am5.math.DEGREES,
+        latitude: solarDeclination(centuries) * am5.math.DEGREES
+      });
+    }
+
+    function equationOfTime(centuries) {
+      let e = eccentricityEarthOrbit(centuries),
+          m = solarGeometricMeanAnomaly(centuries),
+          l = solarGeometricMeanLongitude(centuries),
+          y = Math.tan(obliquityCorrection(centuries) / 2);
+      y *= y;
+      return (
+        y * Math.sin(2 * l) -
+        2 * e * Math.sin(m) +
+        4 * e * y * Math.sin(m) * Math.cos(2 * l) -
+        0.5 * y * y * Math.sin(4 * l) -
+        1.25 * e * e * Math.sin(2 * m)
+      );
+    }
+
+    function solarDeclination(centuries) {
+      return Math.asin(
+        Math.sin(obliquityCorrection(centuries)) *
+        Math.sin(solarApparentLongitude(centuries))
+      );
+    }
+
+    function solarApparentLongitude(centuries) {
+      return (
+        solarTrueLongitude(centuries) -
+        (0.00569 +
+          0.00478 *
+            Math.sin((125.04 - 1934.136 * centuries) * am5.math.RADIANS)) *
+          am5.math.RADIANS
+      );
+    }
+
+    function solarTrueLongitude(centuries) {
+      return (
+        solarGeometricMeanLongitude(centuries) +
+        solarEquationOfCenter(centuries)
+      );
+    }
+
+    function solarGeometricMeanAnomaly(centuries) {
+      return (
+        (357.52911 + centuries * (35999.05029 - 0.0001537 * centuries)) *
+        am5.math.RADIANS
+      );
+    }
+
+    function solarGeometricMeanLongitude(centuries) {
+      let l = (280.46646 + centuries * (36000.76983 + centuries * 0.0003032)) % 360;
+      return ((l < 0 ? l + 360 : l) / 180) * Math.PI;
+    }
+
+    function solarEquationOfCenter(centuries) {
+      let m = solarGeometricMeanAnomaly(centuries);
+      return (
+        (Math.sin(m) *
+          (1.914602 - centuries * (0.004817 + 0.000014 * centuries)) +
+          Math.sin(m + m) * (0.019993 - 0.000101 * centuries) +
+          Math.sin(m + m + m) * 0.000289) *
+        am5.math.RADIANS
+      );
+    }
+
+    function obliquityCorrection(centuries) {
+      return (
+        meanObliquityOfEcliptic(centuries) +
+        0.00256 *
+          Math.cos((125.04 - 1934.136 * centuries) * am5.math.RADIANS) *
+          am5.math.RADIANS
+      );
+    }
+
+    function meanObliquityOfEcliptic(centuries) {
+      return (
+        (23 +
+          (26 +
+            (21.448 -
+              centuries * (46.815 + centuries * (0.00059 - centuries * 0.001813))) /
+              60) /
+            60) *
+        am5.math.RADIANS
+      );
+    }
+
+    function eccentricityEarthOrbit(centuries) {
+      return 0.016708634 - centuries * (0.000042037 + 0.0000001267 * centuries);
+    }
+
+    // Guardamos la referencia para destruirlo luego
+    chartSunRef.current = rootSun;
+
+    // ======================================================
+    //                 CALCULAR HORAS DE SOL CON SunCalc
+    // ======================================================
+    if (latitude != null && longitude != null) {
+      const times = SunCalc.getTimes(new Date(), latitude, longitude);
+      const sunrise = times.sunrise;
+      const sunset = times.sunset;
+
+      // Formatear las horas
+      const formatTime = (date) => {
+        return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+      };
+
+      setSunriseTime(formatTime(sunrise));
+      setSunsetTime(formatTime(sunset));
+    }
+
+    // ======================================================
+    //                 GAUGES DE TEMPERATURA Y HUMEDAD (amCharts 4)
+    // ======================================================
     const gaugeTemp = am4core.create('gaugeTemperatura', am4charts.GaugeChart);
     gaugeTemp.innerRadius = am4core.percent(82);
 
-    // Eje del gauge de Temperatura con rangos fijos
     const axisTemp = gaugeTemp.xAxes.push(new am4charts.ValueAxis());
-    axisTemp.min = -20; // Mínimo fijo
-    axisTemp.max = 80;  // Máximo fijo
+    axisTemp.min = -20;
+    axisTemp.max = 80;
     axisTemp.strictMinMax = true;
     axisTemp.renderer.axisFills.template.fill = am4core.color('#fff');
     axisTemp.renderer.labels.template.fill = am4core.color('#000');
 
-    // Definir los rangos dinámicos basados en tempMin y tempMax
-    const tempLowEnd = tempMin !== null ? tempMin : 0; // Valor predeterminado si tempMin es null
-    const tempMidEnd = tempMax !== null ? tempMax : 50; // Valor predeterminado si tempMax es null
+    const tempLowEnd = tempMin !== null ? tempMin : 0;
+    const tempMidEnd = tempMax !== null ? tempMax : 50;
 
-    // Rango Bajo
     const rangeTempLow = axisTemp.axisRanges.create();
     rangeTempLow.value = axisTemp.min;
     rangeTempLow.endValue = tempLowEnd;
-    rangeTempLow.axisFill.fill = am4core.color('#0000FF'); // Azul
+    rangeTempLow.axisFill.fill = am4core.color('#0000FF');
     rangeTempLow.axisFill.fillOpacity = 1;
 
-    // Rango Medio
     const rangeTempMid = axisTemp.axisRanges.create();
     rangeTempMid.value = tempLowEnd;
     rangeTempMid.endValue = tempMidEnd;
-    rangeTempMid.axisFill.fill = am4core.color('#00FF00'); // Verde
+    rangeTempMid.axisFill.fill = am4core.color('#00FF00');
     rangeTempMid.axisFill.fillOpacity = 1;
 
-    // Rango Alto
     const rangeTempHigh = axisTemp.axisRanges.create();
     rangeTempHigh.value = tempMidEnd;
     rangeTempHigh.endValue = axisTemp.max;
-    rangeTempHigh.axisFill.fill = am4core.color('#FF0000'); // Rojo
+    rangeTempHigh.axisFill.fill = am4core.color('#FF0000');
     rangeTempHigh.axisFill.fillOpacity = 1;
 
-    // Mano del gauge de Temperatura
     const handTemp = gaugeTemp.hands.push(new am4charts.ClockHand());
     handTemp.value = currentTemperature !== null ? currentTemperature : axisTemp.min;
 
-    // Título del gauge de Temperatura
-    const titleTemp = gaugeTemp.chartContainer.createChild(am4core.Label);
-    titleTemp.fontSize = 20;
-    titleTemp.horizontalCenter = 'middle';
-    titleTemp.y = am4core.percent(100);
-
-    // Guardar referencia
     gaugeTempRef.current = gaugeTemp;
 
-
-    // --------------------
-    // Gauge de Humedad
-    // --------------------
     const gaugeHum = am4core.create('gaugeHumedad', am4charts.GaugeChart);
     gaugeHum.innerRadius = am4core.percent(82);
 
-    // Eje del gauge de Humedad con rangos fijos
     const axisHum = gaugeHum.xAxes.push(new am4charts.ValueAxis());
-    axisHum.min = 0;    // Mínimo fijo
-    axisHum.max = 100;  // Máximo fijo
+    axisHum.min = 0;
+    axisHum.max = 100;
     axisHum.strictMinMax = true;
     axisHum.renderer.axisFills.template.fill = am4core.color('#fff');
     axisHum.renderer.labels.template.fill = am4core.color('#000');
 
-    // Definir los rangos dinámicos basados en humMin y humMax
-    const humLowEnd = humMin !== null ? humMin : 30; // Valor predeterminado si humMin es null
-    const humMidEnd = humMax !== null ? humMax : 60; // Valor predeterminado si humMax es null
+    const humLowEnd = humMin !== null ? humMin : 30;
+    const humMidEnd = humMax !== null ? humMax : 60;
 
-    // Rango Bajo
     const rangeHumLow = axisHum.axisRanges.create();
     rangeHumLow.value = axisHum.min;
     rangeHumLow.endValue = humLowEnd;
-    rangeHumLow.axisFill.fill = am4core.color('#0000FF'); // Azul
+    rangeHumLow.axisFill.fill = am4core.color('#0000FF');
     rangeHumLow.axisFill.fillOpacity = 1;
 
-    // Rango Medio
     const rangeHumMid = axisHum.axisRanges.create();
     rangeHumMid.value = humLowEnd;
     rangeHumMid.endValue = humMidEnd;
-    rangeHumMid.axisFill.fill = am4core.color('#00FF00'); // Verde
+    rangeHumMid.axisFill.fill = am4core.color('#00FF00');
     rangeHumMid.axisFill.fillOpacity = 1;
 
-    // Rango Alto
     const rangeHumHigh = axisHum.axisRanges.create();
     rangeHumHigh.value = humMidEnd;
     rangeHumHigh.endValue = axisHum.max;
-    rangeHumHigh.axisFill.fill = am4core.color('#FFFF00'); // Amarillo
+    rangeHumHigh.axisFill.fill = am4core.color('#FFFF00');
     rangeHumHigh.axisFill.fillOpacity = 1;
 
-    // Mano del gauge de Humedad
     const handHum = gaugeHum.hands.push(new am4charts.ClockHand());
     handHum.value = currentHumidity !== null ? currentHumidity : axisHum.min;
 
-    // Título del gauge de Humedad
-    const titleHum = gaugeHum.chartContainer.createChild(am4core.Label);
-    titleHum.fontSize = 20;
-    titleHum.horizontalCenter = 'middle';
-    titleHum.y = am4core.percent(100);
-
-    // Guardar referencia
     gaugeHumRef.current = gaugeHum;
-
 
     // Limpieza en caso de que el componente se desmonte
     return () => {
+      // Destruir gráficos amCharts 4
       if (chartTemp) {
         chartTemp.dispose();
       }
@@ -478,9 +686,26 @@ const Station = () => {
       if (gaugeHum) {
         gaugeHum.dispose();
       }
+      // Destruir globo amCharts 5
+      if (chartSunRef.current) {
+        chartSunRef.current.dispose();
+        chartSunRef.current = null;
+      }
+      // Si usaste setInterval para updateDayNight, limpialo:
+      // clearInterval(interval);
     };
-
-  }, [datosEstacion, tempMax, tempMin, humMax, humMin, currentTemperature, currentHumidity]);
+  }, [
+    datosEstacion,
+    tempMax,
+    tempMin,
+    humMax,
+    humMin,
+    currentTemperature,
+    currentHumidity,
+    infoEstacion?.timezone,
+    latitude,
+    longitude
+  ]);
 
   // Calcular clases condicionales para las cards
   const tempCardClass =
@@ -552,6 +777,40 @@ const Station = () => {
           </div>
         </div>
       </div>
+
+      {/* Nueva Tarjeta: Horas Sol (con amCharts 5) */}
+      {latitude && longitude && (
+        <div className="row mt-4">
+          <div className="col-md-6">
+            <div className="card text-center">
+              <div className="card-header bg-info text-white">
+                <h4>Horas Sol</h4>
+              </div>
+              <div className="card-body">
+                {/* Globo Día/Noche de amCharts 5 */}
+                <div
+                  id="graficoHorasSol"
+                  style={{ width: '100%', height: '300px', margin: '0 auto' }}
+                ></div>
+              </div>
+              <div className="row">
+                <div className="col">
+                  <p>
+                    <span style={{ fontSize: '24px' }}>&#9650;</span> {/* Flecha hacia arriba */}
+                    <span id="sunriseTime">{sunriseTime}</span>
+                  </p>
+                </div>
+                <div className="col">
+                  <p>
+                    <span style={{ fontSize: '24px' }}>&#9660;</span> {/* Flecha hacia abajo */}
+                    <span id="sunsetTime">{sunsetTime}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Formulario para filtrar por fecha/hora */}
       <div className="accordion mt-4" id="accordionFechaHora">
@@ -688,7 +947,7 @@ const Station = () => {
         </div>
       </div>
 
-      {/* Gráficos de Temperatura y Humedad */}
+      {/* Gráficos de Temperatura y Humedad (amCharts 4) */}
       <div className="mt-5">
         <h4 className="text-center">Gráfico de Temperatura</h4>
         <div id="graficoTemperatura" style={{ width: '100%', height: '400px' }} />

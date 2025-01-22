@@ -32,7 +32,7 @@ const Configuration = () => {
   // 1. useEffect para cargar las ZONAS HORARIAS desde un API externo
   useEffect(() => {
     // Puedes usar la API pública de worldtimeapi.org directamente:
-    fetch('https://paulorenteramos.com/api/timezones.json')
+    fetch('https://paulorenteramos.com/api/get-timezones.php')
       .then((res) => {
         if (!res.ok) {
           throw new Error('No se pudo obtener la lista de zonas horarias');
