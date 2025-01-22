@@ -63,6 +63,10 @@ const Station = () => {
   const gaugeTempRef = useRef(null);
   const gaugeHumRef = useRef(null);
 
+  // Estados para controlar los acordeones
+  const [isFechaHoraOpen, setIsFechaHoraOpen] = useState(true);
+  const [isDatosOpen, setIsDatosOpen] = useState(true);
+
   /**
    * Convierte un timestamp en formato "YYYY-MM-DD HH:mm:ss" (UTC)
    * a la hora local de la estación.
@@ -550,27 +554,29 @@ const Station = () => {
       </div>
 
       {/* Formulario para filtrar por fecha/hora */}
-      <div className="accordion form-container mt-4" id="accordionExample">
+      <div className="accordion mt-4" id="accordionFechaHora">
         <div className="card">
-          <div className="card-header" id="headingOne">
-            <h2 className="mb-0">
+          <div className="card-header" id="headingOne" style={{ cursor: 'pointer' }}>
+            <h2 className="mb-0" onClick={() => setIsFechaHoraOpen(!isFechaHoraOpen)}>
               <button
                 className="btn btn-link btn-block text-left"
                 type="button"
-                data-toggle="collapse"
-                data-target="#collapseOne"
-                aria-expanded="true"
+                aria-expanded={isFechaHoraOpen}
                 aria-controls="collapseOne"
+                style={{ textDecoration: 'none' }}
               >
                 Seleccionar Fecha y Hora
+                <span className="float-right">
+                  {isFechaHoraOpen ? '-' : '+'}
+                </span>
               </button>
             </h2>
           </div>
           <div
             id="collapseOne"
-            className="collapse show"
+            className={`collapse ${isFechaHoraOpen ? 'show' : ''}`}
             aria-labelledby="headingOne"
-            data-parent="#accordionExample"
+            data-parent="#accordionFechaHora"
           >
             <div className="card-body">
               <form onSubmit={handleSubmit}>
@@ -608,23 +614,25 @@ const Station = () => {
       {/* Tabla con los datos de la estación */}
       <div className="accordion mt-4" id="accordionDatos">
         <div className="card">
-          <div className="card-header" id="headingTwo">
-            <h2 className="mb-0">
+          <div className="card-header" id="headingTwo" style={{ cursor: 'pointer' }}>
+            <h2 className="mb-0" onClick={() => setIsDatosOpen(!isDatosOpen)}>
               <button
                 className="btn btn-link btn-block text-left"
                 type="button"
-                data-toggle="collapse"
-                data-target="#collapseTwo"
-                aria-expanded="true"
+                aria-expanded={isDatosOpen}
                 aria-controls="collapseTwo"
+                style={{ textDecoration: 'none' }}
               >
                 Mostrar Datos de la Estación
+                <span className="float-right">
+                  {isDatosOpen ? '-' : '+'}
+                </span>
               </button>
             </h2>
           </div>
           <div
             id="collapseTwo"
-            className="collapse show"
+            className={`collapse ${isDatosOpen ? 'show' : ''}`}
             aria-labelledby="headingTwo"
             data-parent="#accordionDatos"
           >
