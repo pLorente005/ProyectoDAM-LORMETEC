@@ -8,6 +8,7 @@ import ControlPanel from './Pages/ControlPanelPage/ControlPanelPage';
 import Station from './Pages/StationPage/StationPage';
 import HomePage from './Pages/HomePage/HomePage';
 import Configuration from './Pages/ConfigurationPage/ConfigurationPage';
+import Report from './Pages/ReportsPage/ReportsPage';
 import PrivateRoute from './components/routes/PrivateRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -30,6 +31,9 @@ function App() {
             <Route path="/panel-control" element={<PrivateRoute element={<ControlPanel/>} />} />
             {/* Página de configuración de la estación */}
             <Route path="/configurar-estacion" element={<Configuration/>} />
+
+            {/* Ruta protegida para el incidencias */}
+            <Route path="/incidencias" element={<PrivateRoute element={<Report/>} />} />
             {/* Página de detalles de la estación meteorológica */}
             <Route path="/estacion" element={<Station/>} />
           </Routes>

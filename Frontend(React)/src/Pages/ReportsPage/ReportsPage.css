@@ -1,0 +1,48 @@
+html, body {
+    height: 100%;
+    margin: 0;
+  }
+  
+  body {
+    background-color: #e8f5e9;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+
+  /* Contenedor principal del reporte */
+  .report-page-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .report-page-container h2, .report-page-container h3 {
+    color: #2e7d32;
+  }
+  
+  /* Formulario */
+  .form-container {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    transition: all 0.3s ease-in-out;
+  }
+  
+ 
+  
+
+ 
+
+
+
+
+  
+
+  

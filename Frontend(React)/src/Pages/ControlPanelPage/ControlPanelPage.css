@@ -73,11 +73,18 @@ body {
 
 /* Botón de incidencias */
 .btn-incidencias {
-  background-color: #ffc107;
-  color: #212529;
+  background-color: #ffc107; /* Color de fondo original */
+  color: #212529; /* Color del texto */
   margin-top: 20px;
   margin-bottom: 20px;
   float: right;
+  border: none; /* Sin borde */
+  transition: background-color 0.3s ease, box-shadow 0.3s ease; /* Transiciones suaves */
+}
+
+.btn-incidencias:hover {
+  background-color: #e0a800; /* Color más oscuro en hover */
+  color: #212529; /* El color del texto permanece igual */
 }
 
 /* Estilos de lista para las estaciones */

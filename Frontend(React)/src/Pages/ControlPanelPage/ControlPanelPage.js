@@ -19,7 +19,7 @@ const ControlPanel = () => {
     try {
       const response = await fetch('/api/panel-control.php', {
         method: 'GET',
-        credentials: 'include', // Incluimos cookies de sesión
+        credentials: 'include', //cookies de sesión
       });
       const data = await response.json();
 
@@ -107,11 +107,21 @@ const ControlPanel = () => {
       <PageTitle title="Panel de Control" />
       <p>Bienvenido, {nombreUsuario || 'Usuario'}.</p>
 
-      <Button
-        text={mostrarFormulario ? 'Cancelar' : 'Añadir Estación'}
-        onClick={toggleFormulario}
-        className="btn-success me-2"
-      />
+      <div className="button-group">
+        <Button
+          text={mostrarFormulario ? 'Cancelar' : 'Añadir Estación'}
+          onClick={toggleFormulario}
+          className="btn-success"
+        />
+
+        {/* Botón para ver incidencias con estilo correcto */}
+        <button
+          className="btn btn-incidencias"
+          onClick={() => navigate('/incidencias')}
+        >
+          Ver Incidencias
+        </button>
+      </div>
 
       {mostrarFormulario && (
         <div className="form-container mt-4">
@@ -144,7 +154,6 @@ const ControlPanel = () => {
               text={loading ? 'Cargando...' : 'Añadir'}
               disabled={loading}
             />
-
           </form>
         </div>
       )}
