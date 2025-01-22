@@ -360,36 +360,42 @@ const Station = () => {
     const gaugeTemp = am4core.create('gaugeTemperatura', am4charts.GaugeChart);
     gaugeTemp.innerRadius = am4core.percent(82);
 
-    // Eje del gauge de Temperatura
+    // Eje del gauge de Temperatura con rangos fijos
     const axisTemp = gaugeTemp.xAxes.push(new am4charts.ValueAxis());
-    axisTemp.min = tempMin !== null ? tempMin - 5 : 0; // Ajusta el mínimo según tempMin
-    axisTemp.max = tempMax !== null ? tempMax + 5 : 50; // Ajusta el máximo según tempMax
+    axisTemp.min = -20; // Mínimo fijo
+    axisTemp.max = 80;  // Máximo fijo
     axisTemp.strictMinMax = true;
     axisTemp.renderer.axisFills.template.fill = am4core.color('#fff');
     axisTemp.renderer.labels.template.fill = am4core.color('#000');
 
-    // Rango de colores para Temperatura
+    // Definir los rangos dinámicos basados en tempMin y tempMax
+    const tempLowEnd = tempMin !== null ? tempMin : 0; // Valor predeterminado si tempMin es null
+    const tempMidEnd = tempMax !== null ? tempMax : 50; // Valor predeterminado si tempMax es null
+
+    // Rango Bajo
     const rangeTempLow = axisTemp.axisRanges.create();
-    rangeTempLow.value = tempMin !== null ? tempMin - 5 : 0;
-    rangeTempLow.endValue = tempMin !== null ? tempMin : 0;
+    rangeTempLow.value = axisTemp.min;
+    rangeTempLow.endValue = tempLowEnd;
     rangeTempLow.axisFill.fill = am4core.color('#0000FF'); // Azul
     rangeTempLow.axisFill.fillOpacity = 1;
 
+    // Rango Medio
     const rangeTempMid = axisTemp.axisRanges.create();
-    rangeTempMid.value = tempMin !== null ? tempMin : 0;
-    rangeTempMid.endValue = tempMax !== null ? tempMax : 50;
+    rangeTempMid.value = tempLowEnd;
+    rangeTempMid.endValue = tempMidEnd;
     rangeTempMid.axisFill.fill = am4core.color('#00FF00'); // Verde
     rangeTempMid.axisFill.fillOpacity = 1;
 
+    // Rango Alto
     const rangeTempHigh = axisTemp.axisRanges.create();
-    rangeTempHigh.value = tempMax !== null ? tempMax : 50;
-    rangeTempHigh.endValue = tempMax !== null ? tempMax + 5 : 60;
+    rangeTempHigh.value = tempMidEnd;
+    rangeTempHigh.endValue = axisTemp.max;
     rangeTempHigh.axisFill.fill = am4core.color('#FF0000'); // Rojo
     rangeTempHigh.axisFill.fillOpacity = 1;
 
     // Mano del gauge de Temperatura
     const handTemp = gaugeTemp.hands.push(new am4charts.ClockHand());
-    handTemp.value = currentTemperature !== null ? currentTemperature : 0;
+    handTemp.value = currentTemperature !== null ? currentTemperature : axisTemp.min;
 
     // Título del gauge de Temperatura
     const titleTemp = gaugeTemp.chartContainer.createChild(am4core.Label);
@@ -400,42 +406,49 @@ const Station = () => {
     // Guardar referencia
     gaugeTempRef.current = gaugeTemp;
 
+
     // --------------------
     // Gauge de Humedad
     // --------------------
     const gaugeHum = am4core.create('gaugeHumedad', am4charts.GaugeChart);
     gaugeHum.innerRadius = am4core.percent(82);
 
-    // Eje del gauge de Humedad
+    // Eje del gauge de Humedad con rangos fijos
     const axisHum = gaugeHum.xAxes.push(new am4charts.ValueAxis());
-    axisHum.min = humMin !== null ? humMin - 10 : 0; // Ajusta el mínimo según humMin
-    axisHum.max = humMax !== null ? humMax + 10 : 100; // Ajusta el máximo según humMax
+    axisHum.min = 0;    // Mínimo fijo
+    axisHum.max = 100;  // Máximo fijo
     axisHum.strictMinMax = true;
     axisHum.renderer.axisFills.template.fill = am4core.color('#fff');
     axisHum.renderer.labels.template.fill = am4core.color('#000');
 
-    // Rango de colores para Humedad
+    // Definir los rangos dinámicos basados en humMin y humMax
+    const humLowEnd = humMin !== null ? humMin : 30; // Valor predeterminado si humMin es null
+    const humMidEnd = humMax !== null ? humMax : 60; // Valor predeterminado si humMax es null
+
+    // Rango Bajo
     const rangeHumLow = axisHum.axisRanges.create();
-    rangeHumLow.value = humMin !== null ? humMin - 10 : 0;
-    rangeHumLow.endValue = humMin !== null ? humMin : 0;
+    rangeHumLow.value = axisHum.min;
+    rangeHumLow.endValue = humLowEnd;
     rangeHumLow.axisFill.fill = am4core.color('#0000FF'); // Azul
     rangeHumLow.axisFill.fillOpacity = 1;
 
+    // Rango Medio
     const rangeHumMid = axisHum.axisRanges.create();
-    rangeHumMid.value = humMin !== null ? humMin : 0;
-    rangeHumMid.endValue = humMax !== null ? humMax : 100;
+    rangeHumMid.value = humLowEnd;
+    rangeHumMid.endValue = humMidEnd;
     rangeHumMid.axisFill.fill = am4core.color('#00FF00'); // Verde
     rangeHumMid.axisFill.fillOpacity = 1;
 
+    // Rango Alto
     const rangeHumHigh = axisHum.axisRanges.create();
-    rangeHumHigh.value = humMax !== null ? humMax : 100;
-    rangeHumHigh.endValue = humMax !== null ? humMax + 10 : 110;
+    rangeHumHigh.value = humMidEnd;
+    rangeHumHigh.endValue = axisHum.max;
     rangeHumHigh.axisFill.fill = am4core.color('#FFFF00'); // Amarillo
     rangeHumHigh.axisFill.fillOpacity = 1;
 
     // Mano del gauge de Humedad
     const handHum = gaugeHum.hands.push(new am4charts.ClockHand());
-    handHum.value = currentHumidity !== null ? currentHumidity : 0;
+    handHum.value = currentHumidity !== null ? currentHumidity : axisHum.min;
 
     // Título del gauge de Humedad
     const titleHum = gaugeHum.chartContainer.createChild(am4core.Label);
@@ -445,6 +458,7 @@ const Station = () => {
 
     // Guardar referencia
     gaugeHumRef.current = gaugeHum;
+
 
     // Limpieza en caso de que el componente se desmonte
     return () => {
@@ -461,7 +475,23 @@ const Station = () => {
         gaugeHum.dispose();
       }
     };
+
   }, [datosEstacion, tempMax, tempMin, humMax, humMin, currentTemperature, currentHumidity]);
+
+  // Calcular clases condicionales para las cards
+  const tempCardClass =
+    tempMax !== null &&
+    tempMin !== null &&
+    (currentTemperature > tempMax || currentTemperature < tempMin)
+      ? 'light-red-bg'
+      : '';
+
+  const humCardClass =
+    humMax !== null &&
+    humMin !== null &&
+    (currentHumidity > humMax || currentHumidity < humMin)
+      ? 'light-red-bg'
+      : '';
 
   return (
     <div className="container mt-4 panel-control-container">
@@ -492,7 +522,7 @@ const Station = () => {
       {/* Gauges de Temperatura y Humedad */}
       <div className="row mt-4">
         <div className="col-md-6">
-          <div className="card text-center">
+          <div className={`card text-center ${tempCardClass}`}>
             <div className="card-header bg-info text-white">
               <h4>Temperatura Actual</h4>
             </div>
@@ -505,7 +535,7 @@ const Station = () => {
           </div>
         </div>
         <div className="col-md-6">
-          <div className="card text-center">
+          <div className={`card text-center ${humCardClass}`}>
             <div className="card-header bg-info text-white">
               <h4>Humedad Actual</h4>
             </div>
