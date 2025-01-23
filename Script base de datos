@@ -1,0 +1,141 @@
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Base de datos: `u491542488_enviro_monitor`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `incident`
+--
+
+CREATE TABLE `incident` (
+  `serial_number` varchar(7) NOT NULL,
+  `occurred_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `parameter_exceeded` varchar(12) NOT NULL,
+  `value` double NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `station`
+--
+
+CREATE TABLE `station` (
+  `serial_number` varchar(7) NOT NULL,
+  `station_name` varchar(255) DEFAULT NULL,
+  `model` varchar(12) NOT NULL,
+  `user_id` bigint(20) DEFAULT NULL,
+  `max_temperature` double NOT NULL,
+  `min_temperature` double NOT NULL,
+  `max_humidity` double NOT NULL,
+  `min_humidity` double NOT NULL,
+  `location` varchar(255) DEFAULT NULL,
+  `timezone` varchar(64) DEFAULT NULL,
+  `latitude` double DEFAULT NULL,
+  `altitude` double DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `station_data`
+--
+
+CREATE TABLE `station_data` (
+  `serial_number` varchar(7) NOT NULL,
+  `recorded_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `temperature` double NOT NULL,
+  `humidity` double NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `user`
+--
+
+CREATE TABLE `user` (
+  `id` bigint(20) NOT NULL,
+  `email` varchar(30) NOT NULL,
+  `name` varchar(20) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `is_admin` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Índices para tablas volcadas
+--
+
+--
+-- Indices de la tabla `incident`
+--
+ALTER TABLE `incident`
+  ADD PRIMARY KEY (`serial_number`,`occurred_at`);
+
+--
+-- Indices de la tabla `station`
+--
+ALTER TABLE `station`
+  ADD PRIMARY KEY (`serial_number`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indices de la tabla `station_data`
+--
+ALTER TABLE `station_data`
+  ADD PRIMARY KEY (`serial_number`,`recorded_at`);
+
+--
+-- Indices de la tabla `user`
+--
+ALTER TABLE `user`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- AUTO_INCREMENT de las tablas volcadas
+--
+
+--
+-- AUTO_INCREMENT de la tabla `user`
+--
+ALTER TABLE `user`
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+--
+-- Restricciones para tablas volcadas
+--
+
+--
+-- Filtros para la tabla `incident`
+--
+ALTER TABLE `incident`
+  ADD CONSTRAINT `incident_ibfk_1` FOREIGN KEY (`serial_number`) REFERENCES `station` (`serial_number`);
+
+--
+-- Filtros para la tabla `station`
+--
+ALTER TABLE `station`
+  ADD CONSTRAINT `station_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`);
+
+--
+-- Filtros para la tabla `station_data`
+--
+ALTER TABLE `station_data`
+  ADD CONSTRAINT `station_data_ibfk_1` FOREIGN KEY (`serial_number`) REFERENCES `station` (`serial_number`);
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

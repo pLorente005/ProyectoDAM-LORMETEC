@@ -1,0 +1,67 @@
+import requests
+import random
+import time
+
+# Endpoint de tu API en PHP (usa HTTPS si tu hosting redirige HTTP a HTTPS)
+API_ENDPOINT = "https://paulorenteramos.com/api/station-data/recieve-data.php"
+
+# El token de seguridad definido en tu PHP
+API_TOKEN = "TuTokenDeSeguridad123"
+
+# Número de serie de la estación, debe existir en la tabla `station` de tu BD
+SERIAL_NUMBER = "TEST123"
+
+# Inicializamos las variables de temperatura y humedad
+current_temperature = 20.0  # Temperatura inicial en °C
+current_humidity = 50.0  # Humedad inicial en %
+
+
+def simulate_station():
+    global current_temperature, current_humidity
+
+    while True:
+        # Simulación de una tendencia de temperatura (sube o baja lentamente)
+        temperature_change = random.uniform(-0.5, 0.5)  # Cambio pequeño, entre -0.5°C y 0.5°C
+        current_temperature += temperature_change
+
+        # Limitar el rango de temperatura entre -5°C y 55°C
+        if current_temperature < -5:
+            current_temperature = -5
+        elif current_temperature > 55:
+            current_temperature = 55
+
+        # Simulación de una tendencia de humedad (sube o baja lentamente)
+        humidity_change = random.uniform(-1, 1)  # Cambio pequeño, entre -1% y 1%
+        current_humidity += humidity_change
+
+        # Limitar el rango de humedad entre 0% y 100%
+        if current_humidity < 0:
+            current_humidity = 0
+        elif current_humidity > 100:
+            current_humidity = 100
+
+        # Redondear los valores a 2 decimales
+        temperature = round(current_temperature, 2)
+        humidity = round(current_humidity, 2)
+
+        # Construir el payload (diccionario Python)
+        data = {
+            "serial_number": SERIAL_NUMBER,
+            "temperature": temperature,
+            "humidity": humidity,
+            "api_token": API_TOKEN
+        }
+
+        try:
+            # Hacer la solicitud POST en formato JSON
+            response = requests.post(API_ENDPOINT, json=data)
+            print(f"Enviando: {data} -> Respuesta del servidor: {response.text}")
+        except Exception as e:
+            print(f"Error de conexión: {e}")
+
+        # Esperar 60 segundos antes de enviar el siguiente registro
+        time.sleep(60)
+
+
+if __name__ == "__main__":
+    simulate_station()
