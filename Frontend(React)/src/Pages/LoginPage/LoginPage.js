@@ -1,5 +1,4 @@
-// src/pages/LoginPage/Login.js
-
+// React Component Login.js
 import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom'; // Importar Link
 import { AuthContext } from '../../context/AuthContext';
@@ -42,8 +41,12 @@ const Login = () => {
         // Actualizar el estado de autenticación
         setIsAuthenticated(true);
 
-        // Redirigir al panel de control
-        navigate('/panel-control');
+        // Verificar si el usuario es administrador y redirigir
+        if (data.is_admin === 1) {
+          navigate('/admin-page'); // Redirigir a la página de administración
+        } else {
+          navigate('/panel-control'); // Redirigir al panel de control
+        }
       } else {
         setErrorMessage(data.message || 'Error desconocido.');
       }
@@ -83,7 +86,6 @@ const Login = () => {
             required
           />
         </div>
-        {/* Reemplazamos el botón HTML con el componente Button */}
         <Button
           text={loading ? 'Cargando...' : 'Ingresar'}
           className="btn-primary btn-login"
@@ -92,7 +94,6 @@ const Login = () => {
         />
       </form>
       {errorMessage && <p className="error-message text-center text-danger">{errorMessage}</p>}
-      {/* Enlace para ir a la página de registro */}
       <p className="text-center mt-3">
         ¿No tienes una cuenta? <Link to="/register">Regístrate aquí</Link>
       </p>

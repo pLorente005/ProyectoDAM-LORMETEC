@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom'; 
+import React, { useState, useEffect } from 'react'; 
+import { useLocation } from 'react-router-dom';
 import PageTitle from '../../components/PageTitle/PageTitle';
 
 const Configuration = () => {
@@ -65,7 +65,8 @@ const Configuration = () => {
       .then(data => {
         if (data && data.success && data.config) {
           setConfig({
-            nombre: data.config.model || '',
+            // Aquí se asume que la columna de BD se llama station_name
+            nombre: data.config.station_name || '',
             temp_max: data.config.max_temperature?.toString() || '',
             temp_min: data.config.min_temperature?.toString() || '',
             hum_max: data.config.max_humidity?.toString() || '',
@@ -243,7 +244,6 @@ const Configuration = () => {
               value={config.timezone}
               onChange={handleChange}
             >
-              {/* Si no hay datos, podríamos mostrar un <option> de cargando... */}
               {timezones.length === 0 ? (
                 <option value="">Cargando zonas horarias...</option>
               ) : (
@@ -256,7 +256,9 @@ const Configuration = () => {
             </select>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Guardar</button>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+            Guardar
+          </button>
         </form>
 
         {mensaje && (

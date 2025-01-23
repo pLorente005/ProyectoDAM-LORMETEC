@@ -9,6 +9,7 @@ import Station from './Pages/StationPage/StationPage';
 import HomePage from './Pages/HomePage/HomePage';
 import Configuration from './Pages/ConfigurationPage/ConfigurationPage';
 import Report from './Pages/ReportsPage/ReportsPage';
+import Admin from './Pages/AdminPage/AdminPage';
 import PrivateRoute from './components/routes/PrivateRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -25,6 +26,8 @@ function App() {
             <Route path="/" element={<HomePage />} />
             {/* Página de inicio de sesión */}
             <Route path="/login" element={<Login />} />
+            {/* Página de inicio de sesión */}
+            <Route path="/admin" element={<Admin />} />
             {/* Página de registro */}
             <Route path="/register" element={<Register />} />
             {/* Ruta protegida para el Panel de Control */}
