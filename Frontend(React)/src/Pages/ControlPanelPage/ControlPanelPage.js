@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom'; // Importamos Link
+import { useNavigate, Link } from 'react-router-dom';
 import Button from '../../components/Button/Button';
 import PageTitle from '../../components/PageTitle/PageTitle';
 import './ControlPanelPage.css';
@@ -12,22 +12,19 @@ const ControlPanel = () => {
   const [modelo, setModelo] = useState('');
   const [alerta, setAlerta] = useState(null);
   const [loading, setLoading] = useState(false);
-
   const navigate = useNavigate();
 
   const cargarEstaciones = async () => {
     try {
       const response = await fetch('/api/panel-control.php', {
         method: 'GET',
-        credentials: 'include', //cookies de sesión
+        credentials: 'include',
       });
       const data = await response.json();
-
       if (response.ok && data.success) {
         setNombreUsuario(data.nombreUsuario);
         setEstaciones(data.estaciones || []);
       } else if (response.status === 401) {
-        // Usuario no autenticado
         navigate('/login');
       } else {
         setAlerta({ tipo: 'danger', texto: data.message || 'No se pudieron cargar las estaciones.' });
@@ -39,7 +36,6 @@ const ControlPanel = () => {
 
   useEffect(() => {
     cargarEstaciones();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleFormulario = () => {
@@ -59,7 +55,6 @@ const ControlPanel = () => {
         body: JSON.stringify({ numeroSerie, modelo }),
       });
       const data = await response.json();
-
       if (response.ok && data.success) {
         setAlerta({ tipo: 'success', texto: data.message });
         setMostrarFormulario(false);
@@ -74,7 +69,6 @@ const ControlPanel = () => {
     }
   };
 
-  // Ocultar alerta automáticamente después de 5 segundos
   useEffect(() => {
     if (alerta) {
       const timer = setTimeout(() => setAlerta(null), 5000);
@@ -90,7 +84,6 @@ const ControlPanel = () => {
         credentials: 'include',
       });
       const data = await response.json();
-
       if (response.ok && data.success) {
         setAlerta({ tipo: 'success', texto: data.message });
         cargarEstaciones();
@@ -106,15 +99,12 @@ const ControlPanel = () => {
     <div className="container mt-4 panel-control-container">
       <PageTitle title="Panel de Control" />
       <p>Bienvenido, {nombreUsuario || 'Usuario'}.</p>
-
       <div className="button-group">
         <Button
           text={mostrarFormulario ? 'Cancelar' : 'Añadir Estación'}
           onClick={toggleFormulario}
           className="btn-success"
         />
-
-        {/* Botón para ver incidencias con estilo correcto */}
         <button
           className="btn btn-incidencias"
           onClick={() => navigate('/incidencias')}
@@ -165,15 +155,13 @@ const ControlPanel = () => {
             <li key={estacion.serial_number} className="list-group-item d-flex justify-content-between align-items-center">
               <div>
                 <Link to={`/estacion?serial_number=${encodeURIComponent(estacion.serial_number)}`}>
-                  <strong>Número de Serie:</strong> {estacion.serial_number}
-                  <br />
-                  <strong>Modelo:</strong> {estacion.model}
-                  <br />
+                  <strong>Nombre de la Estación:</strong> {estacion.station_name || 'No especificado'}<br />
+                  <strong>Número de Serie:</strong> {estacion.serial_number}<br />
+                  <strong>Modelo:</strong> {estacion.model}<br />
                   <strong>Ubicación:</strong> {estacion.location || 'No especificada'}
                 </Link>
               </div>
               <div>
-                {/* Botón para ir a la configuración de la estación */}
                 <Button
                   text={<i className="bi bi-gear-fill"></i>}
                   onClick={() => navigate(`/configurar-estacion?serial_number=${encodeURIComponent(estacion.serial_number)}`)}
@@ -191,7 +179,6 @@ const ControlPanel = () => {
       ) : (
         <p>No tienes estaciones vinculadas.</p>
       )}
-
       {alerta && (
         <div className={`alert alert-${alerta.tipo} custom-alert mt-4`} role="alert">
           {alerta.texto}

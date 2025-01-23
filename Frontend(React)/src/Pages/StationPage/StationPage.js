@@ -2,27 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
-// ---- amCharts 4 ----
 import * as am4core from '@amcharts/amcharts4/core';
 import * as am4charts from '@amcharts/amcharts4/charts';
 import am4themes_animated from '@amcharts/amcharts4/themes/animated';
-
-// Aplicamos el tema animado de amCharts 4
-am4core.useTheme(am4themes_animated);
-
-// ---- amCharts 5 (para el globo terráqueo) ----
 import * as am5 from '@amcharts/amcharts5';
 import * as am5map from '@amcharts/amcharts5/map';
 import am5themes_Animated from '@amcharts/amcharts5/themes/Animated';
 import am5geodata_worldLow from '@amcharts/amcharts5-geodata/worldLow';
-
-// Iconos de Leaflet
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import SunCalc from 'suncalc';
+import PageTitle from '../../components/PageTitle/PageTitle';
+import './StationPage.css';
 
-// Ajustamos la ruta de los iconos para que no aparezcan rotos
+am4core.useTheme(am4themes_animated);
+
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -30,22 +25,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Importar SunCalc
-import SunCalc from 'suncalc';
-
-import PageTitle from '../../components/PageTitle/PageTitle';
-import './StationPage.css';
-
 const Station = () => {
   const navigate = useNavigate();
   const query = new URLSearchParams(useLocation().search);
-
-  // State principal
   const initialSerial = query.get('serial_number') || '';
   const [serialNumber, setSerialNumber] = useState(initialSerial);
   const [fecha, setFecha] = useState(query.get('fecha') || '');
   const [hora, setHora] = useState(query.get('hora') || '');
-
   const [infoEstacion, setInfoEstacion] = useState(null);
   const [estadoEstacion, setEstadoEstacion] = useState('');
   const [currentTemperature, setCurrentTemperature] = useState(null);
@@ -55,53 +41,24 @@ const Station = () => {
   const [humMax, setHumMax] = useState(null);
   const [humMin, setHumMin] = useState(null);
   const [datosEstacion, setDatosEstacion] = useState([]);
-
-  // Alerta
   const [alerta, setAlerta] = useState(null);
-
-  // Estado para el mapa Leaflet
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
   const [map, setMap] = useState(null);
-
-  // Nuevos estados para las horas de sol
   const [sunriseTime, setSunriseTime] = useState('--:--');
   const [sunsetTime, setSunsetTime] = useState('--:--');
-
-  // Referencias a los gráficos (para destruirlos al recargar datos)
   const chartTempRef = useRef(null);
   const chartHumRef = useRef(null);
-
-  // Referencia para el globo de “Horas Sol” (amCharts 5)
   const chartSunRef = useRef(null);
-
-  // Referencias para los gauges
   const gaugeTempRef = useRef(null);
   const gaugeHumRef = useRef(null);
-
-  // ==============================
-  // PRONÓSTICO DE OPENWEATHER
-  // ==============================
-  // Estado para almacenar los datos devueltos por OpenWeather
   const [forecastData, setForecastData] = useState(null);
-
-  // Estado para el rango de pronóstico seleccionado ("3h", "24h", "5d")
   const [forecastRange, setForecastRange] = useState('24h');
-
-  // Estado para la precipitación acumulada en el rango
   const [accumulatedPrecip, setAccumulatedPrecip] = useState(0);
-
-  // Referencia para el gauge de precipitación
   const gaugePrecipRef = useRef(null);
-
-  // Estados para controlar los acordeones
   const [isFechaHoraOpen, setIsFechaHoraOpen] = useState(true);
   const [isDatosOpen, setIsDatosOpen] = useState(true);
 
-  /**
-   * Convierte un timestamp en formato "YYYY-MM-DD HH:mm:ss" (UTC)
-   * a la hora local de la estación.
-   */
   function formatLocalTimestamp(timestampUTC, stationTz) {
     if (!timestampUTC) return '';
     const date = new Date(timestampUTC + 'Z');
@@ -112,10 +69,6 @@ const Station = () => {
     });
   }
 
-  /**
-   * Llamada al endpoint /api/estacion.php para obtener la información
-   * y los datos de la estación.
-   */
   const cargarDatos = async () => {
     try {
       let url = `/api/estacion.php?serial_number=${encodeURIComponent(serialNumber)}`;
@@ -138,14 +91,10 @@ const Station = () => {
         setHumMax(data.humMax);
         setHumMin(data.humMin);
         setDatosEstacion(data.datosEstacion);
-
-        // Guardamos lat y long para el mapa
         setLatitude(data.latitude);
         setLongitude(data.longitude);
-
         setAlerta(null);
       } else if (response.status === 401) {
-        // Usuario no autenticado, redirigir a login
         navigate('/login');
       } else {
         setAlerta({
@@ -158,15 +107,12 @@ const Station = () => {
     }
   };
 
-  // Efecto para cargar datos de la estación cuando cambian serialNumber, fecha u hora
   useEffect(() => {
     if (serialNumber) {
       cargarDatos();
     }
-    // eslint-disable-next-line
   }, [serialNumber, fecha, hora]);
 
-  // Efecto para ocultar la alerta tras 5 segundos
   useEffect(() => {
     if (alerta) {
       const timer = setTimeout(() => setAlerta(null), 5000);
@@ -174,53 +120,34 @@ const Station = () => {
     }
   }, [alerta]);
 
-  // Inicializar/actualizar mapa Leaflet cuando tenemos lat/long
   useEffect(() => {
     if (latitude && longitude) {
       if (!map) {
-        // Crear un mapa por primera vez
         const newMap = L.map('map-leaflet').setView([latitude, longitude], 13);
-
-        // Capa base (OpenStreetMap)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap'
         }).addTo(newMap);
-
-        // Añadir marcador
         L.marker([latitude, longitude]).addTo(newMap);
-
-        // Guardar la referencia en el state
         setMap(newMap);
       } else {
-        // Si el mapa ya existe, solo muevo la vista
         map.setView([latitude, longitude], 13);
         L.marker([latitude, longitude]).addTo(map);
       }
     }
   }, [latitude, longitude, map]);
 
-  /**
-   * Manejar el envío del formulario: cambiamos la URL con los params,
-   * y React Router recargará el componente con esos valores.
-   */
   const handleSubmit = (e) => {
     e.preventDefault();
     const params = new URLSearchParams();
     params.set('serial_number', serialNumber);
     if (fecha) params.set('fecha', fecha);
     if (hora) params.set('hora', hora);
-
     navigate(`/estacion?${params.toString()}`);
   };
 
-  // ======================================================
-  //  1) Llamar a OpenWeather con las coordenadas de la estación
-  // ======================================================
   useEffect(() => {
-    // Solo llamamos al servidor PHP si tenemos lat y lon
     if (!latitude || !longitude) return;
-
     const fetchPrecipitaciones = async () => {
       try {
         const response = await fetch('api/get-weather.php', {
@@ -233,40 +160,26 @@ const Station = () => {
             longitude,
           }),
         });
-
         const data = await response.json();
-
         if (data.error) {
-          console.error('Error al obtener los datos:', data.error);
-          setForecastData(null);  
+          setForecastData(null);
         } else {
-          setForecastData(data);  
+          setForecastData(data);
         }
       } catch (error) {
-        console.error('Error al conectar con el servidor:', error);
+        setForecastData(null);
       }
     };
-
     fetchPrecipitaciones();
-  }, [latitude, longitude]);  // Vuelve a ejecutar el efecto si las coordenadas cambian
+  }, [latitude, longitude]);
 
-  // ======================================================
-  //  2) Calcular la precipitación acumulada según forecastRange
-  //     (3 horas, 24 horas o 5 días [máx. 5 días que da la API]).
-  // ======================================================
   useEffect(() => {
     if (!forecastData || !forecastData.list) {
       setAccumulatedPrecip(0);
       return;
     }
-
     let sum = 0;
     let intervalsNeeded = 0;
-
-    // Cada intervalo de "list" son 3 horas. 
-    // - 3h -> 1 intervalo
-    // - 24h -> 8 intervalos (8 x 3 = 24)
-    // - 5d -> ~40 intervalos (la API da 5 días, 3h c/u => 8 x 5 = 40)
     switch (forecastRange) {
       case '3h':
         intervalsNeeded = 1;
@@ -275,24 +188,18 @@ const Station = () => {
         intervalsNeeded = 8;
         break;
       case '5d':
-        intervalsNeeded = forecastData.list.length; // normalmente 40
+        intervalsNeeded = forecastData.list.length;
         break;
       default:
-        intervalsNeeded = 8; // fallback
+        intervalsNeeded = 8;
     }
-
     for (let i = 0; i < intervalsNeeded && i < forecastData.list.length; i++) {
       sum += forecastData.list[i].rain?.['3h'] ?? 0;
     }
-
     setAccumulatedPrecip(sum);
   }, [forecastData, forecastRange]);
 
-  // ======================================================
-  //  3) Construir/Actualizar todos los gráficos amCharts 4 y 5
-  // ======================================================
   useEffect(() => {
-    // Si no hay datos de la estación, destruir gráficos si existen.
     if (!datosEstacion || datosEstacion.length === 0) {
       if (chartTempRef.current) {
         chartTempRef.current.dispose();
@@ -320,8 +227,6 @@ const Station = () => {
       }
       return;
     }
-
-    // Destruir instancias previas para evitar fugas de memoria
     if (chartTempRef.current) chartTempRef.current.dispose();
     if (chartHumRef.current) chartHumRef.current.dispose();
     if (chartSunRef.current) {
@@ -332,35 +237,25 @@ const Station = () => {
     if (gaugeHumRef.current) gaugeHumRef.current.dispose();
     if (gaugePrecipRef.current) gaugePrecipRef.current.dispose();
 
-    // ---- Preparar datos para los gráficos de amCharts 4 (Temp y Hum) ----
     const chartData = datosEstacion.map(dato => ({
       timestamp: new Date(dato.timestamp + 'Z'),
       temperature: Number(dato.temperature),
       humidity: Number(dato.humidity)
     }));
 
-    // ======================================================
-    //   GRÁFICO DE TEMPERATURA (amCharts 4)
-    // ======================================================
     const chartTemp = am4core.create('graficoTemperatura', am4charts.XYChart);
     chartTemp.data = chartData;
     if (infoEstacion?.timezone) {
       chartTemp.dateFormatter.timezone = infoEstacion.timezone;
     }
-
-    // Eje X (fecha-hora)
     const dateAxisTemp = chartTemp.xAxes.push(new am4charts.DateAxis());
     dateAxisTemp.title.text = 'Fecha y Hora';
     dateAxisTemp.tooltipDateFormat = 'dd/MM/yyyy HH:mm:ss';
-
-    // Eje Y (temperatura)
     const valueAxisTemp = chartTemp.yAxes.push(new am4charts.ValueAxis());
     valueAxisTemp.title.text = 'Temperatura (°C)';
     valueAxisTemp.min = -20;
     valueAxisTemp.max = 80;
     valueAxisTemp.baseValue = -20;
-
-    // Serie de Temperatura
     const seriesTemp = chartTemp.series.push(new am4charts.LineSeries());
     seriesTemp.dataFields.valueY = 'temperature';
     seriesTemp.dataFields.dateX = 'timestamp';
@@ -370,12 +265,8 @@ const Station = () => {
     seriesTemp.stroke = am4core.color('rgba(255, 99, 132, 1)');
     seriesTemp.fillOpacity = 0.2;
     seriesTemp.fill = am4core.color('rgba(255, 99, 132, 0.2)');
-
-    // Cursor para hover
     chartTemp.cursor = new am4charts.XYCursor();
     chartTemp.cursor.xAxis = dateAxisTemp;
-
-    // Líneas de referencia (Temp Max/Min)
     if (tempMax != null) {
       const rangeMaxTemp = valueAxisTemp.axisRanges.create();
       rangeMaxTemp.value = tempMax;
@@ -396,30 +287,20 @@ const Station = () => {
       rangeMinTemp.label.fill = am4core.color('#0000FF');
       rangeMinTemp.label.verticalCenter = 'top';
     }
-
     chartTempRef.current = chartTemp;
 
-    // ======================================================
-    //   GRÁFICO DE HUMEDAD (amCharts 4)
-    // ======================================================
     const chartHum = am4core.create('graficoHumedad', am4charts.XYChart);
     chartHum.data = chartData;
     if (infoEstacion?.timezone) {
       chartHum.dateFormatter.timezone = infoEstacion.timezone;
     }
-
-    // Eje X (fecha-hora)
     const dateAxisHum = chartHum.xAxes.push(new am4charts.DateAxis());
     dateAxisHum.title.text = 'Fecha y Hora';
     dateAxisHum.tooltipDateFormat = 'dd/MM/yyyy HH:mm:ss';
-
-    // Eje Y (humedad)
     const valueAxisHum = chartHum.yAxes.push(new am4charts.ValueAxis());
     valueAxisHum.title.text = 'Humedad (%)';
     valueAxisHum.min = 0;
     valueAxisHum.max = 100;
-
-    // Serie de Humedad
     const seriesHum = chartHum.series.push(new am4charts.LineSeries());
     seriesHum.dataFields.valueY = 'humidity';
     seriesHum.dataFields.dateX = 'timestamp';
@@ -429,12 +310,8 @@ const Station = () => {
     seriesHum.stroke = am4core.color('rgba(54, 162, 235, 1)');
     seriesHum.fillOpacity = 0.2;
     seriesHum.fill = am4core.color('rgba(54, 162, 235, 0.2)');
-
-    // Cursor para hover
     chartHum.cursor = new am4charts.XYCursor();
     chartHum.cursor.xAxis = dateAxisHum;
-
-    // Líneas de referencia (Hum Max/Min)
     if (humMax != null) {
       const rangeMaxHum = valueAxisHum.axisRanges.create();
       rangeMaxHum.value = humMax;
@@ -455,15 +332,10 @@ const Station = () => {
       rangeMinHum.label.fill = am4core.color('#0000FF');
       rangeMinHum.label.verticalCenter = 'top';
     }
-
     chartHumRef.current = chartHum;
 
-    // ======================================================
-    //   GLOBO DÍA/NOCHE (amCharts 5) - “graficoHorasSol”
-    // ======================================================
     const rootSun = am5.Root.new('graficoHorasSol');
     rootSun.setThemes([am5themes_Animated.new(rootSun)]);
-
     const chartSun = rootSun.container.children.push(
       am5map.MapChart.new(rootSun, {
         panX: 'rotateX',
@@ -471,7 +343,6 @@ const Station = () => {
         projection: am5map.geoOrthographic()
       })
     );
-
     const backgroundSeries = chartSun.series.push(am5map.MapPolygonSeries.new(rootSun, {}));
     backgroundSeries.mapPolygons.template.setAll({
       fill: rootSun.interfaceColors.get('alternativeBackground'),
@@ -481,15 +352,12 @@ const Station = () => {
     backgroundSeries.data.push({
       geometry: am5map.getGeoRectangle(90, 180, -90, -180)
     });
-
     const polygonSeries = chartSun.series.push(
       am5map.MapPolygonSeries.new(rootSun, {
         geoJSON: am5geodata_worldLow
       })
     );
-
     const sunSeries = chartSun.series.push(am5map.MapPointSeries.new(rootSun, {}));
-    // Halo
     sunSeries.bullets.push(() => {
       let circle = am5.Circle.new(rootSun, {
         radius: 18,
@@ -505,7 +373,6 @@ const Station = () => {
       });
       return am5.Bullet.new(rootSun, { sprite: circle });
     });
-    // Bolita
     sunSeries.bullets.push(() => {
       return am5.Bullet.new(rootSun, {
         sprite: am5.Circle.new(rootSun, {
@@ -514,16 +381,13 @@ const Station = () => {
         })
       });
     });
-
     const sunDataItem = sunSeries.pushDataItem({});
-
     const nightSeries = chartSun.series.push(am5map.MapPolygonSeries.new(rootSun, {}));
     nightSeries.mapPolygons.template.setAll({
       fill: am5.color(0x000000),
       fillOpacity: 0.25,
       strokeOpacity: 0
     });
-
     const nightDataItem0 = nightSeries.pushDataItem({});
     const nightDataItem1 = nightSeries.pushDataItem({});
     const nightDataItem2 = nightSeries.pushDataItem({});
@@ -532,19 +396,16 @@ const Station = () => {
       let sunPos = solarPosition(time);
       sunDataItem.set('longitude', sunPos.longitude);
       sunDataItem.set('latitude', sunPos.latitude);
-
       let nightPos = {
         longitude: sunPos.longitude + 180,
         latitude: -sunPos.latitude
       };
-
       nightDataItem0.set('geometry', am5map.getGeoCircle(nightPos, 92));
       nightDataItem1.set('geometry', am5map.getGeoCircle(nightPos, 90));
       nightDataItem2.set('geometry', am5map.getGeoCircle(nightPos, 88));
     }
 
     updateDayNight(Date.now());
-
     chartSunRef.current = rootSun;
 
     function solarPosition(time) {
@@ -574,7 +435,7 @@ const Station = () => {
     function solarDeclination(centuries) {
       return Math.asin(
         Math.sin(obliquityCorrection(centuries)) *
-          Math.sin(solarApparentLongitude(centuries))
+        Math.sin(solarApparentLongitude(centuries))
       );
     }
 
@@ -583,8 +444,8 @@ const Station = () => {
         solarTrueLongitude(centuries) -
         (0.00569 +
           0.00478 *
-            Math.sin((125.04 - 1934.136 * centuries) * am5.math.RADIANS)) *
-          am5.math.RADIANS
+          Math.sin((125.04 - 1934.136 * centuries) * am5.math.RADIANS)) *
+        am5.math.RADIANS
       );
     }
 
@@ -619,8 +480,8 @@ const Station = () => {
       return (
         meanObliquityOfEcliptic(centuries) +
         0.00256 *
-          Math.cos((125.04 - 1934.136 * centuries) * am5.math.RADIANS) *
-          am5.math.RADIANS
+        Math.cos((125.04 - 1934.136 * centuries) * am5.math.RADIANS) *
+        am5.math.RADIANS
       );
     }
 
@@ -640,9 +501,6 @@ const Station = () => {
       return 0.016708634 - centuries * (0.000042037 + 0.0000001267 * centuries);
     }
 
-    // ======================================================
-    //   CALCULAR HORAS DE SOL CON SunCalc
-    // ======================================================
     if (latitude != null && longitude != null) {
       const times = SunCalc.getTimes(new Date(), latitude, longitude);
       const sunrise = times.sunrise;
@@ -651,123 +509,89 @@ const Station = () => {
         date.getHours().toString().padStart(2, '0') +
         ':' +
         date.getMinutes().toString().padStart(2, '0');
-
       setSunriseTime(formatTime(sunrise));
       setSunsetTime(formatTime(sunset));
     }
 
-    // ======================================================
-    //   GAUGES DE TEMPERATURA Y HUMEDAD (amCharts 4)
-    // ======================================================
-    // Temperatura
     const gaugeTemp = am4core.create('gaugeTemperatura', am4charts.GaugeChart);
     gaugeTemp.innerRadius = am4core.percent(82);
-
     const axisTemp = gaugeTemp.xAxes.push(new am4charts.ValueAxis());
     axisTemp.min = -20;
     axisTemp.max = 80;
     axisTemp.strictMinMax = true;
-
     const tempLowEnd = tempMin !== null ? tempMin : 0;
     const tempMidEnd = tempMax !== null ? tempMax : 50;
-
     const rangeTempLow = axisTemp.axisRanges.create();
     rangeTempLow.value = axisTemp.min;
     rangeTempLow.endValue = tempLowEnd;
     rangeTempLow.axisFill.fill = am4core.color('#0000FF');
     rangeTempLow.axisFill.fillOpacity = 1;
-
     const rangeTempMid = axisTemp.axisRanges.create();
     rangeTempMid.value = tempLowEnd;
     rangeTempMid.endValue = tempMidEnd;
     rangeTempMid.axisFill.fill = am4core.color('#00FF00');
     rangeTempMid.axisFill.fillOpacity = 1;
-
     const rangeTempHigh = axisTemp.axisRanges.create();
     rangeTempHigh.value = tempMidEnd;
     rangeTempHigh.endValue = axisTemp.max;
     rangeTempHigh.axisFill.fill = am4core.color('#FF0000');
     rangeTempHigh.axisFill.fillOpacity = 1;
-
     const handTemp = gaugeTemp.hands.push(new am4charts.ClockHand());
     handTemp.value = currentTemperature !== null ? currentTemperature : axisTemp.min;
-
     gaugeTempRef.current = gaugeTemp;
 
-    // Humedad
     const gaugeHum = am4core.create('gaugeHumedad', am4charts.GaugeChart);
     gaugeHum.innerRadius = am4core.percent(82);
-
     const axisHum = gaugeHum.xAxes.push(new am4charts.ValueAxis());
     axisHum.min = 0;
     axisHum.max = 100;
     axisHum.strictMinMax = true;
-
     const humLowEnd = humMin !== null ? humMin : 30;
     const humMidEnd = humMax !== null ? humMax : 60;
-
     const rangeHumLow = axisHum.axisRanges.create();
     rangeHumLow.value = axisHum.min;
     rangeHumLow.endValue = humLowEnd;
     rangeHumLow.axisFill.fill = am4core.color('#0000FF');
     rangeHumLow.axisFill.fillOpacity = 1;
-
     const rangeHumMid = axisHum.axisRanges.create();
     rangeHumMid.value = humLowEnd;
     rangeHumMid.endValue = humMidEnd;
     rangeHumMid.axisFill.fill = am4core.color('#00FF00');
     rangeHumMid.axisFill.fillOpacity = 1;
-
     const rangeHumHigh = axisHum.axisRanges.create();
     rangeHumHigh.value = humMidEnd;
     rangeHumHigh.endValue = axisHum.max;
     rangeHumHigh.axisFill.fill = am4core.color('#FFFF00');
     rangeHumHigh.axisFill.fillOpacity = 1;
-
     const handHum = gaugeHum.hands.push(new am4charts.ClockHand());
     handHum.value = currentHumidity !== null ? currentHumidity : axisHum.min;
-
     gaugeHumRef.current = gaugeHum;
 
-    // ======================================================
-    //   GAUGE DE PRECIPITACIÓN (amCharts 4)
-    // ======================================================
     const gaugePrecip = am4core.create('gaugePrecipitacion', am4charts.GaugeChart);
     gaugePrecip.innerRadius = am4core.percent(82);
-
     const axisPrecip = gaugePrecip.xAxes.push(new am4charts.ValueAxis());
     axisPrecip.min = 0;
-    axisPrecip.max = 50; // Ajusta el máximo a lo que consideres razonable
+    axisPrecip.max = 50;
     axisPrecip.strictMinMax = true;
-
-    // Rango "bajo" de precipitación
     const rangePrecipLow = axisPrecip.axisRanges.create();
     rangePrecipLow.value = 0;
     rangePrecipLow.endValue = 10;
     rangePrecipLow.axisFill.fill = am4core.color('#00FF00');
     rangePrecipLow.axisFill.fillOpacity = 1;
-
-    // Rango "medio"
     const rangePrecipMid = axisPrecip.axisRanges.create();
     rangePrecipMid.value = 10;
     rangePrecipMid.endValue = 30;
     rangePrecipMid.axisFill.fill = am4core.color('#FFFF00');
     rangePrecipMid.axisFill.fillOpacity = 1;
-
-    // Rango "alto"
     const rangePrecipHigh = axisPrecip.axisRanges.create();
     rangePrecipHigh.value = 30;
     rangePrecipHigh.endValue = axisPrecip.max;
     rangePrecipHigh.axisFill.fill = am4core.color('#FF0000');
     rangePrecipHigh.axisFill.fillOpacity = 1;
-
     const handPrecip = gaugePrecip.hands.push(new am4charts.ClockHand());
-    // Usamos 'accumulatedPrecip' como valor:
     handPrecip.value = accumulatedPrecip;
-
     gaugePrecipRef.current = gaugePrecip;
 
-    // Limpieza
     return () => {
       if (chartTemp) chartTemp.dispose();
       if (chartHum) chartHum.dispose();
@@ -793,7 +617,6 @@ const Station = () => {
     accumulatedPrecip
   ]);
 
-  // Calcular clases condicionales para las cards
   const tempCardClass =
     tempMax !== null &&
     tempMin !== null &&
@@ -808,10 +631,7 @@ const Station = () => {
       ? 'light-red-bg'
       : '';
 
-  // Mensajes según la precipitación acumulada
   const isNoRain = accumulatedPrecip === 0;
-
-  // Para mostrar texto debajo del gauge de precipitación
   const rangeText =
     forecastRange === '3h'
       ? 'En las próximas 3 horas'
@@ -823,11 +643,11 @@ const Station = () => {
     <div className="container mt-4 panel-control-container">
       <PageTitle title="Datos de la Estación" />
 
-      {/* Info general de la estación */}
       {infoEstacion && (
         <div className="info-mapa-container mt-4">
           <div className="info">
-            <h3>{infoEstacion.nombre}</h3>
+            <h3>{infoEstacion.station_name}</h3>
+            <p><strong>Modelo:</strong> {infoEstacion.modelo}</p>
             <p><strong>Número de Serie:</strong> {serialNumber}</p>
             <p><strong>Ubicación:</strong> {infoEstacion.location}</p>
             <p><strong>Zona Horaria:</strong> {infoEstacion.timezone}</p>
@@ -837,15 +657,12 @@ const Station = () => {
             </p>
             <p><strong>Estado:</strong> {estadoEstacion}</p>
           </div>
-
-          {/* Mapa con Leaflet */}
           <div className="map-container">
             <div id="map-leaflet" style={{ height: '300px', width: '100%' }} />
           </div>
         </div>
       )}
 
-      {/* Gauges de Temperatura y Humedad */}
       <div className="row mt-4">
         <div className="col-md-6">
           <div className={`card text-center ${tempCardClass}`}>
@@ -875,99 +692,85 @@ const Station = () => {
         </div>
       </div>
 
-      {/* Tarjeta: Horas Sol (amCharts 5) */}
-      {latitude && longitude && (
-        <div className="row mt-4">
-          <div className="col-md-6">
-            <div className="card text-center">
-              <div className="card-header bg-info text-white">
-                <h4>Horas Sol</h4>
-              </div>
-              <div className="card-body">
-                <div
-                  id="graficoHorasSol"
-                  style={{ width: '100%', height: '300px', margin: '0 auto' }}
-                ></div>
-              </div>
-              <div className="row">
-                <div className="col">
-                  <p>
-                    <span style={{ fontSize: '24px' }}>&#9650;</span>{' '}
-                    <span id="sunriseTime">{sunriseTime}</span>
-                  </p>
-                </div>
-                <div className="col">
-                  <p>
-                    <span style={{ fontSize: '24px' }}>&#9660;</span>{' '}
-                    <span id="sunsetTime">{sunsetTime}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
+      <div className="row mt-4">
+  {latitude && longitude && (
+    <div className="col-md-6">
+      <div className="card text-center">
+        <div className="card-header bg-info text-white">
+          <h4>Horas Sol</h4>
+        </div>
+        <div className="card-body">
+          <div
+            id="graficoHorasSol"
+            style={{ width: '100%', height: '300px', margin: '0 auto' }}
+          ></div>
+        </div>
+        <div className="row">
+          <div className="col">
+            <p>
+              <span style={{ fontSize: '24px' }}>&#9650;</span>{' '}
+              <span id="sunriseTime">{sunriseTime}</span>
+            </p>
+          </div>
+          <div className="col">
+            <p>
+              <span style={{ fontSize: '24px' }}>&#9660;</span>{' '}
+              <span id="sunsetTime">{sunsetTime}</span>
+            </p>
           </div>
         </div>
-      )}
+      </div>
+    </div>
+  )}
 
-      {/* Tarjeta: Precipitación acumulada según rango */}
-      {forecastData && forecastData.list && (
-        <div className="row mt-4">
-          <div className="col-md-6">
-            <div className="card text-center">
-              <div className="card-header bg-info text-white">
-                <h4>Precipitación</h4>
-              </div>
-              <div className="card-body">
-                {/* Gauge de precipitación */}
-                <div 
-                  id="gaugePrecipitacion" 
-                  style={{ width: '100%', height: '200px', marginTop: '5px' }}  
-                ></div>
-
-                {/* Valor en mm */}
-                <p className="display-4">
-                  {accumulatedPrecip.toFixed(2)} mm
-                </p>
-                <p>{rangeText}</p>
-
-                {/* Mensajito según si hay o no lluvia */}
-                <div className="row">
-                  <div className="col">
-                    {isNoRain ? (
-                      <p>
-                        <span className="text-success">Sin precipitaciones 😊</span>
-                      </p>
-                    ) : (
-                      <p>
-                        <span className="text-warning">Se espera lluvia 😅</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
+  {forecastData && forecastData.list && (
+    <div className="col-md-6">
+      <div className="card text-center">
+        <div className="card-header bg-info text-white">
+          <h4>Precipitación</h4>
+        </div>
+        <div className="card-body">
+          <div
+            id="gaugePrecipitacion"
+            style={{ width: '100%', height: '200px', marginTop: '5px' }}
+          ></div>
+          <p className="display-4">{accumulatedPrecip.toFixed(2)} mm</p>
+          <p>{rangeText}</p>
+          <div className="row">
+            <div className="col">
+              {isNoRain ? (
                 <p>
-                  Las precipitaciones de hoy han sido{' '}
-                  {isNoRain ? 'nulas en comparación con días anteriores.' : 'similares a las anteriores.'}
+                  <span className="text-success">Sin precipitaciones 😊</span>
                 </p>
-
-                {/* Selector de rango */}
-                <div className="form-group">
-                  <label>Rango de Pronóstico:</label>
-                  <select
-                    className="form-control"
-                    value={forecastRange}
-                    onChange={(e) => setForecastRange(e.target.value)}
-                  >
-                    <option value="3h">Próximas 3 horas</option>
-                    <option value="24h">Próximas 24 horas</option>
-                    <option value="5d">Próximos 5 días</option>
-                  </select>
-                </div>
-              </div>
+              ) : (
+                <p>
+                  <span className="text-warning">Se espera lluvia 😅</span>
+                </p>
+              )}
             </div>
           </div>
+          <p>
+            Las precipitaciones de hoy han sido{' '}
+            {isNoRain ? 'nulas en comparación con días anteriores.' : 'similares a las anteriores.'}
+          </p>
+          <div className="form-group">
+            <label>Rango de Pronóstico:</label>
+            <select
+              className="form-control"
+              value={forecastRange}
+              onChange={(e) => setForecastRange(e.target.value)}
+            >
+              <option value="3h">Próximas 3 horas</option>
+              <option value="24h">Próximas 24 horas</option>
+              <option value="5d">Próximos 5 días</option>
+            </select>
+          </div>
         </div>
-      )}
+      </div>
+    </div>
+  )}
+</div>
 
-      {/* Formulario para filtrar por fecha/hora */}
       <div className="accordion mt-4" id="accordionFechaHora">
         <div className="card">
           <div className="card-header" id="headingOne" style={{ cursor: 'pointer' }}>
@@ -1023,7 +826,6 @@ const Station = () => {
         </div>
       </div>
 
-      {/* Tabla con los datos de la estación */}
       <div className="accordion mt-4" id="accordionDatos">
         <div className="card">
           <div className="card-header" id="headingTwo" style={{ cursor: 'pointer' }}>
@@ -1098,16 +900,13 @@ const Station = () => {
         </div>
       </div>
 
-      {/* Gráficos de Temperatura y Humedad (amCharts 4) */}
       <div className="mt-5">
         <h4 className="text-center">Gráfico de Temperatura</h4>
         <div id="graficoTemperatura" style={{ width: '100%', height: '400px' }} />
-
         <h4 className="text-center mt-5">Gráfico de Humedad</h4>
         <div id="graficoHumedad" style={{ width: '100%', height: '400px' }} />
       </div>
 
-      {/* Alerta */}
       {alerta && (
         <div className={`alert alert-${alerta.tipo} custom-alert mt-4`} role="alert">
           {alerta.texto}

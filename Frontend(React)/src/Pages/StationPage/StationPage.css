@@ -40,12 +40,12 @@ padding: 30px 20px;
 }
 
 .bg-primary {
-background-color: #0078d7 !important;
+background-color: #1b5e20 !important;
 }
 
 .bg-info {
-background: linear-gradient(135deg, rgba(237, 247, 255, 1) 0%, rgba(219, 234, 255, 1) 50%, rgba(198, 218, 255, 1) 100%);
-color: white; /* Asegura que el texto sea blanco */
+  background: linear-gradient(135deg, #2e7d32 0%, #2e7d32 50%, #2e7d32 100%);
+  color: white; /* Asegura que el texto sea blanco */
 }
 
 .btn-link {

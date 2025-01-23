@@ -5,16 +5,13 @@ require_once 'auth.php';
 header('Content-Type: application/json');
 
 try {
-    // Verificar autenticación
     $sessionData = verifyAuthentication();
     $usuarioID = $sessionData['usuario_id'];
     $nombreUsuario = $sessionData['nombre'];
     $usuarioEmail = $sessionData['email'];
 
-    // Conexión a la base de datos
     $conn = getDbConnection();
 
-    // Manejar la eliminación de una estación si se ha solicitado
     if ($_SERVER['REQUEST_METHOD'] === 'DELETE' && isset($_GET['serial_number'])) {
         $serialNumber = $_GET['serial_number'];
         $resultado = eliminarEstacion($conn, $usuarioID, $serialNumber);
@@ -30,7 +27,6 @@ try {
         exit;
     }
 
-    // Manejar la adición de una estación si se ha enviado el formulario
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = json_decode(file_get_contents("php://input"), true);
         $numeroSerie = $data['numeroSerie'] ?? '';
@@ -56,28 +52,21 @@ try {
         exit;
     }
 
-    // Obtener todas las estaciones vinculadas al usuario
     $estaciones = obtenerEstacionesVinculadas($conn, $usuarioID);
 
-    // Devolver los datos en formato JSON
     echo json_encode([
         'success' => true,
         'nombreUsuario' => $nombreUsuario,
         'estaciones' => $estaciones
     ]);
 
-    // Cerrar la conexión
     $conn->close();
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
 
-/**
- * Función para añadir una estación.
- */
 function añadirEstacion($conn, $usuarioID, $numeroSerie, $modelo) {
-    // Verificar si la estación existe
     $sqlCheckDevice = "SELECT user_id FROM station WHERE serial_number = ? AND model = ?";
     $stmtCheckDevice = $conn->prepare($sqlCheckDevice);
     $stmtCheckDevice->bind_param("ss", $numeroSerie, $modelo);
@@ -89,7 +78,6 @@ function añadirEstacion($conn, $usuarioID, $numeroSerie, $modelo) {
         $currentUserId = $row['user_id'];
 
         if ($currentUserId === null) {
-            // La estación no está asociada a ningún usuario, proceder a asociarla
             $sqlAssociateStation = "UPDATE station SET user_id = ? WHERE serial_number = ?";
             $stmtAssociateStation = $conn->prepare($sqlAssociateStation);
             $stmtAssociateStation->bind_param("is", $usuarioID, $numeroSerie);
@@ -98,10 +86,8 @@ function añadirEstacion($conn, $usuarioID, $numeroSerie, $modelo) {
             }
             return "Error al asociar la estación.";
         } elseif ($currentUserId == $usuarioID) {
-            // La estación ya está asociada a este usuario
             return "El dispositivo ya está asociado a este usuario.";
         } else {
-            // La estación está asociada a otro usuario
             return "El dispositivo ya está asociado a otro usuario.";
         }
     }
@@ -109,11 +95,10 @@ function añadirEstacion($conn, $usuarioID, $numeroSerie, $modelo) {
     return "El número de serie '$numeroSerie' no existe en la base de datos.";
 }
 
-/**
- * Función para obtener estaciones vinculadas a un usuario.
- */
 function obtenerEstacionesVinculadas($conn, $usuarioID) {
-    $sql = "SELECT serial_number, model, location FROM station WHERE user_id = ?";
+    $sql = "SELECT serial_number, station_name, model, location 
+            FROM station 
+            WHERE user_id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $usuarioID);
     $stmt->execute();
@@ -123,12 +108,10 @@ function obtenerEstacionesVinculadas($conn, $usuarioID) {
     while ($row = $result->fetch_assoc()) {
         $estaciones[] = $row;
     }
+
     return $estaciones;
 }
 
-/**
- * Función para eliminar una estación vinculada a un usuario.
- */
 function eliminarEstacion($conn, $usuarioID, $serialNumber) {
     $sqlVerify = "SELECT * FROM station WHERE serial_number = ? AND user_id = ?";
     $stmtVerify = $conn->prepare($sqlVerify);

@@ -3,7 +3,7 @@ session_set_cookie_params([
     'lifetime' => 0,
     'path' => '/',
     'domain' => '',
-    'secure' => false, // Cambia a true si usas HTTPS
+    'secure' => false, 
     'httponly' => true,
     'samesite' => 'Lax',
 ]);

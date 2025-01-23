@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import './AdminPage.css';
 
@@ -16,18 +16,13 @@ const Admin = () => {
         setSuccessMessage('');
         setErrorMessage('');
 
-        // Verificar autenticación
-        if (!user || user.role !== 'admin') {
-            navigate('/login');
-            return;
-        }
+
 
         try {
             const response = await fetch('/api/admin.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${user.token}` // Incluir token
                 },
                 body: JSON.stringify({
                     serial_number: serialNumber,
@@ -44,7 +39,6 @@ const Admin = () => {
             setSuccessMessage('Estación añadida exitosamente.');
             setSerialNumber('');
             setModel('');
-
         } catch (error) {
             setErrorMessage(error.message || 'Error al procesar la solicitud');
             console.error('Error:', error);

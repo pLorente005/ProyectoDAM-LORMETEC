@@ -5,16 +5,13 @@ require_once 'auth.php';
 header('Content-Type: application/json');
 
 try {
-    // Verificar autenticación
     $sessionData    = verifyAuthentication();
     $usuarioID      = $sessionData['usuario_id'];
     $nombreUsuario  = $sessionData['nombre'];
 
-    // Conexión a la base de datos
     $conn = getDbConnection();
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        // Determinar filtro
         $filter = $_GET['filter'] ?? 'all'; // day, week, month, all
         $timeCondition = '';
         if ($filter === 'day') {
@@ -28,7 +25,6 @@ try {
             $timeCondition = " AND i.occurred_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) ";
         }
 
-        // Consulta principal
         $sql = "
             SELECT i.serial_number,
                    i.occurred_at,
@@ -55,19 +51,15 @@ try {
         $stmt->execute();
         $result = $stmt->get_result();
 
-        // Extraemos todas las filas
         $rawIncidencias = [];
         while ($row = $result->fetch_assoc()) {
             $rawIncidencias[] = $row;
         }
 
-        // Tiempo máximo de separación (2 minutos)
         $TIEMPO_MAX_SEPARACION = 120; // 2 * 60
 
-        // Arreglo final de incidencias agrupadas
         $incidenciasAgrupadas = [];
 
-        // Variables de control del grupo actual
         $ultimoSerial = null;
         $ultimoParametro = null;
         $fechaInicio = null;
@@ -81,7 +73,6 @@ try {
             $fechaActual       = $incidencia['occurred_at'];
             $valorExcedido     = $incidencia['value'];
 
-            // Info de estación
             $nombreEstacion    = $incidencia['station_name'] ?? 'No especificada';
             $minTemp           = $incidencia['min_temperature'];
             $maxTemp           = $incidencia['max_temperature'];
@@ -90,7 +81,6 @@ try {
             $latitude          = $incidencia['latitude'];
             $altitude          = $incidencia['altitude'];
 
-            // Parche: si viene TEMPERATURE_ sin HIGH/LOW
             if ($paramActual === 'TEMPERATURE_') {
                 if ($valorExcedido > $maxTemp) {
                     $paramActual = 'TEMPERATURE_HIG';
@@ -102,7 +92,6 @@ try {
             $fechaActualTs = strtotime($fechaActual);
 
             if ($ultimoSerial === null) {
-                // Primer grupo
                 $ultimoSerial       = $serialActual;
                 $ultimoParametro    = $paramActual;
                 $fechaInicio        = $fechaActual;
@@ -121,7 +110,6 @@ try {
                 continue;
             }
 
-            // Diferencia con el fin anterior
             $diferenciaSegundos = $fechaActualTs - $fechaFinTimestamp;
 
             if (
@@ -129,7 +117,6 @@ try {
                 $paramActual !== $ultimoParametro ||
                 $diferenciaSegundos > $TIEMPO_MAX_SEPARACION
             ) {
-                // Cerrar grupo anterior
                 $duracion = calcularDuracion(strtotime($fechaFin) - strtotime($fechaInicio));
                 $incidenciasAgrupadas[] = [
                     'serial_number' => $ultimoSerial,
@@ -137,7 +124,6 @@ try {
                     'fecha_inicio'  => $fechaInicio,
                     'fecha_fin'     => $fechaFin,
                     'duracion'      => $duracion,
-                    // Info de estación
                     'station_name'   => $stationDetails['station_name'],
                     'min_temperature'=> $stationDetails['min_temperature'],
                     'max_temperature'=> $stationDetails['max_temperature'],
@@ -147,7 +133,6 @@ try {
                     'altitude'       => $stationDetails['altitude']
                 ];
 
-                // Nuevo grupo
                 $ultimoSerial       = $serialActual;
                 $ultimoParametro    = $paramActual;
                 $fechaInicio        = $fechaActual;
@@ -164,13 +149,11 @@ try {
                     'altitude'       => $altitude
                 ];
             } else {
-                // Continuar en el mismo grupo
                 $fechaFin = $fechaActual;
                 $fechaFinTimestamp = $fechaActualTs;
             }
         }
 
-        // Cerrar el último grupo si quedó abierto
         if ($ultimoSerial !== null) {
             $duracion = calcularDuracion(strtotime($fechaFin) - strtotime($fechaInicio));
             $incidenciasAgrupadas[] = [
@@ -198,7 +181,6 @@ try {
         exit;
     }
 
-    // Método no permitido
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Método no permitido.']);
     $conn->close();

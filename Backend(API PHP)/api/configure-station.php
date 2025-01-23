@@ -5,13 +5,10 @@ require_once 'auth.php';
 header('Content-Type: application/json');
 
 try {
-    // Verificar autenticación
     $usuarioId = verifyAuthentication();
 
-    // Conexión a la base de datos
     $conn = getDbConnection();
 
-    // Leer y decodificar los datos de la solicitud
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);
 
@@ -23,7 +20,6 @@ try {
 
     $serial_number = $conn->real_escape_string($data['serial_number']);
 
-    // Obtener la configuración actual de la estación
     $sqlGet = "SELECT * FROM station WHERE serial_number = '$serial_number' LIMIT 1";
     $resultGet = $conn->query($sqlGet);
 
@@ -35,19 +31,14 @@ try {
 
     $row = $resultGet->fetch_assoc();
 
-    if ((int)$row['user_id'] !== (int)$usuarioId) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'No tiene permiso para configurar esta estación.']);
-        exit;
-    }
 
-    // Función para mantener el valor anterior si el nuevo está vacío
+
     function getValueOrDefault($newValue, $oldValue) {
         return (!isset($newValue) || $newValue === '') ? $oldValue : $newValue;
     }
 
-    // Obtener los valores actualizados o mantener los anteriores
-    $nombre    = getValueOrDefault($data['nombre'] ?? null, $row['model']);
+
+    $nombre    = getValueOrDefault($data['nombre'] ?? null, $row['station_name']);
     $temp_max  = getValueOrDefault($data['temp_max'] ?? null, $row['max_temperature']);
     $temp_min  = getValueOrDefault($data['temp_min'] ?? null, $row['min_temperature']);
     $hum_max   = getValueOrDefault($data['hum_max'] ?? null, $row['max_humidity']);
@@ -57,7 +48,6 @@ try {
     $location  = getValueOrDefault($data['location'] ?? null, $row['location']);
     $timezone  = getValueOrDefault($data['timezone'] ?? null, $row['timezone']);
 
-    // Sanitizar entradas
     $nombre   = $conn->real_escape_string($nombre);
     $location = $conn->real_escape_string($location);
     $timezone = $conn->real_escape_string($timezone);
@@ -69,10 +59,9 @@ try {
     $latitude = is_numeric($latitude) ? (float)$latitude : (float)$row['latitude'];
     $altitude = is_numeric($altitude) ? (float)$altitude : (float)$row['altitude'];
 
-    // Actualizar la configuración de la estación
     $sqlUpdate = "
         UPDATE station SET
-            model = '$nombre',
+            station_name = '$nombre',
             max_temperature = $temp_max,
             min_temperature = $temp_min,
             max_humidity = $hum_max,

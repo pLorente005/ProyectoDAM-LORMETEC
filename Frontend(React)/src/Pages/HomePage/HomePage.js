@@ -35,8 +35,7 @@ const HomePage = () => {
                 necesidades específicas de nuestros clientes, garantizando siempre la mejor calidad.
               </p>
               <div className="mt-4">
-                <Button text="Contáctanos" link="#contacto" className="btn-primary" />
-                <Button text="Ver Productos" link="#producto" className="btn-primary" />
+               
               </div>
             </div>
             <div className="col-md-6 text-center">

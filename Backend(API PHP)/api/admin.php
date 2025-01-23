@@ -18,6 +18,8 @@ if (!isset($_SESSION['usuario_id']) || $_SESSION['is_admin'] != 1) {
 $data = json_decode(file_get_contents("php://input"), true);
 $serial_number = $data['serial_number'] ?? '';
 $model = $data['model'] ?? '';
+$latitude = $data['latitude'] ?? 1.000; // Valor por defecto
+$altitude = $data['altitude'] ?? 1.000; // Valor por defecto
 
 // Validar que los datos necesarios estén presentes
 if (empty($serial_number) || empty($model)) {
@@ -30,10 +32,10 @@ try {
     // Obtener la conexión a la base de datos
     $conn = getDbConnection();
 
-    // Preparar la consulta SQL para insertar una nueva estación
-    $sql = "INSERT INTO station (serial_number, model) VALUES (?, ?)";
+    // Preparar la consulta SQL para insertar una nueva estación con latitude y altitude
+    $sql = "INSERT INTO station (serial_number, model, latitude, altitude) VALUES (?, ?, ?, ?)";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ss", $serial_number, $model);
+    $stmt->bind_param("ssdd", $serial_number, $model, $latitude, $altitude);
 
     if ($stmt->execute()) {
         echo json_encode(['success' => true, 'message' => 'Estación añadida exitosamente.']);
