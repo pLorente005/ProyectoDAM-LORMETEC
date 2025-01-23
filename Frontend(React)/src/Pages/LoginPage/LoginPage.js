@@ -43,7 +43,7 @@ const Login = () => {
 
         // Verificar si el usuario es administrador y redirigir
         if (data.is_admin === 1) {
-          navigate('/admin-page'); // Redirigir a la página de administración
+          navigate('/admin'); // Redirigir a la página de administración
         } else {
           navigate('/panel-control'); // Redirigir al panel de control
         }

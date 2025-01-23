@@ -12,7 +12,6 @@ import Report from './Pages/ReportsPage/ReportsPage';
 import Admin from './Pages/AdminPage/AdminPage';
 import PrivateRoute from './components/routes/PrivateRoute';
 import { AuthProvider } from './context/AuthContext';
-
 import './App.css';
 
 function App() {
@@ -22,23 +21,20 @@ function App() {
         <div>
           <Navbar />
           <Routes>
-            {/* Página Principal */}
+            {/* Rutas públicas */}
             <Route path="/" element={<HomePage />} />
-            {/* Página de inicio de sesión */}
             <Route path="/login" element={<Login />} />
-            {/* Página de inicio de sesión */}
-            <Route path="/admin" element={<Admin />} />
-            {/* Página de registro */}
             <Route path="/register" element={<Register />} />
-            {/* Ruta protegida para el Panel de Control */}
-            <Route path="/panel-control" element={<PrivateRoute element={<ControlPanel/>} />} />
-            {/* Página de configuración de la estación */}
-            <Route path="/configurar-estacion" element={<Configuration/>} />
 
-            {/* Ruta protegida para el incidencias */}
-            <Route path="/incidencias" element={<PrivateRoute element={<Report/>} />} />
-            {/* Página de detalles de la estación meteorológica */}
-            <Route path="/estacion" element={<Station/>} />
+            {/* Rutas privadas */}
+            <Route path="/admin" element={<PrivateRoute element={<Admin />} />} />
+            <Route path="/panel-control" element={<PrivateRoute element={<ControlPanel />} />} />
+            <Route path="/configurar-estacion" element={<PrivateRoute element={<Configuration />} />} />
+            <Route path="/incidencias" element={<PrivateRoute element={<Report />} />} />
+            <Route path="/estacion" element={<PrivateRoute element={<Station />} />} />
+
+            {/* Redirección para rutas no encontradas */}
+            <Route path="*" element={<HomePage />} />
           </Routes>
           <Footer />
         </div>

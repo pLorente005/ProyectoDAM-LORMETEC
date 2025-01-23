@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { AuthContext } from '../../context/AuthContext';
 import './AdminPage.css';
 
 const Admin = () => {
@@ -6,17 +8,26 @@ const Admin = () => {
     const [model, setModel] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+    const { user } = useContext(AuthContext); // Obtener usuario del contexto
+    const navigate = useNavigate();
 
     const handleAddStation = async (e) => {
         e.preventDefault();
         setSuccessMessage('');
         setErrorMessage('');
 
+        // Verificar autenticación
+        if (!user || user.role !== 'admin') {
+            navigate('/login');
+            return;
+        }
+
         try {
             const response = await fetch('/api/admin.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${user.token}` // Incluir token
                 },
                 body: JSON.stringify({
                     serial_number: serialNumber,
@@ -26,15 +37,17 @@ const Admin = () => {
 
             const data = await response.json();
 
-            if (response.ok && data.success) {
-                setSuccessMessage('Estación añadida exitosamente.');
-                setSerialNumber('');
-                setModel('');
-            } else {
-                setErrorMessage(data.message || 'Error desconocido al añadir la estación.');
+            if (!response.ok) {
+                throw new Error(data.message || 'Error en la solicitud');
             }
+
+            setSuccessMessage('Estación añadida exitosamente.');
+            setSerialNumber('');
+            setModel('');
+
         } catch (error) {
-            setErrorMessage('Error en la solicitud: ' + (error.message || 'Error desconocido.'));
+            setErrorMessage(error.message || 'Error al procesar la solicitud');
+            console.error('Error:', error);
         }
     };
 
@@ -68,8 +81,8 @@ const Admin = () => {
                 </div>
                 <button type="submit" className="btn btn-primary">Añadir Estación</button>
             </form>
-            {successMessage && <p className="success-message mt-3">{successMessage}</p>}
-            {errorMessage && <p className="error-message mt-3">{errorMessage}</p>}
+            {successMessage && <div className="alert alert-success mt-3">{successMessage}</div>}
+            {errorMessage && <div className="alert alert-danger mt-3">{errorMessage}</div>}
         </div>
     );
 };
